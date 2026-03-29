@@ -20,15 +20,19 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": ["default"]
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
     "externalBin": [
       "../engine/dist/engine"
     ]
   }
 }
-

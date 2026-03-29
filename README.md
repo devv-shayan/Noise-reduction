@@ -9,17 +9,16 @@ Local desktop app scaffold for AI-assisted audio cleanup. The repository follows
 
 ## Current Status
 
-This is a structure-first scaffold. It includes:
+This repo now includes:
 
-- architecture and agent rules
-- a minimal React UI that talks to a local FastAPI endpoint
-- a Tauri shell skeleton for the desktop wrapper
-- a Python sidecar with a dummy processing pipeline that copies files
+- a shadcn `radix-nova` desktop UI shell with Process, Jobs, and Settings views
+- a Tauri v2 bootstrap command and sidecar lifecycle wiring
+- a FastAPI engine with model setup, background jobs, and media normalization
+- build scripts for the frontend, Tauri shell, and Python sidecar
 
 ## Next Steps
 
-1. Install frontend and Tauri dependencies.
-2. Create a Python virtual environment inside `engine/.venv`.
-3. Replace the dummy `process_audio` implementation with LavaSR inference.
-4. Wire the packaged Python sidecar into `src-tauri/tauri.conf.json`.
-
+1. Run `npm run engine:install` to create/sync the engine environment with `uv`.
+2. Build the sidecar with `npm run engine:build`.
+3. Start the desktop app with `npm run tauri:dev`.
+4. Replace the placeholder app icons and configure updater signing before shipping installers.

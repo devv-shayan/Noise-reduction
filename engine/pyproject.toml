@@ -1,0 +1,15 @@
+[project]
+name = "noise-reduction-engine"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "imageio-ffmpeg",
+  "pyinstaller",
+  "soundfile",
+  "uvicorn",
+  "LavaSR @ git+https://github.com/ysharma3501/LavaSR.git",
+]
+
+[tool.uv]
+package = false

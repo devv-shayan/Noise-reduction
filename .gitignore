@@ -9,7 +9,19 @@ engine/.venv/
 engine/build/
 engine/dist/
 engine/__pycache__/
-engine/logs/*.log
+engine/logs/*
+!engine/logs/.gitkeep
+engine/model/*
+!engine/model/.gitkeep
+engine/*.spec
+
+# Local captures
+app-window-check*.png
+
+# Local environment overrides
+.env
+.env.local
+.env.*.local
 
 *.pyc
 *.pyo
@@ -18,4 +30,3 @@ engine/logs/*.log
 Thumbs.db
 .idea/
 .vscode/
-

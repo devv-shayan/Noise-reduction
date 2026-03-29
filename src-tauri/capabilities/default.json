@@ -3,6 +3,31 @@
   "identifier": "default",
   "description": "Default capability set for the main application window.",
   "windows": ["main"],
-  "permissions": ["core:default", "shell:default"]
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:event:default",
+    "dialog:default",
+    "opener:default",
+    "process:default",
+    "shell:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "http://127.0.0.1:8000/*"
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "engine",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    }
+  ]
 }
-
