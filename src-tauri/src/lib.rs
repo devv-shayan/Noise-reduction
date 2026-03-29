@@ -3,6 +3,7 @@ use std::{
     io::Write,
     net::{SocketAddr, TcpStream},
     path::Path,
+    process::Command,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -92,6 +93,125 @@ fn is_port_reachable(port: u16) -> bool {
     TcpStream::connect_timeout(&address, Duration::from_millis(250)).is_ok()
 }
 
+fn engine_supports_capabilities(port: u16, log_dir: &Path) -> bool {
+    let url = format!("http://127.0.0.1:{port}/capabilities");
+    let result = tauri::async_runtime::block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(1))
+            .build()
+            .map_err(|error| error.to_string())?;
+        let response = client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|error| error.to_string())?;
+        Ok::<bool, String>(response.status().is_success())
+    });
+
+    match result {
+        Ok(true) => {
+            append_text_log(log_dir, "native", "existing engine passed capability check");
+            true
+        }
+        Ok(false) => {
+            append_text_log(
+                log_dir,
+                "native",
+                "existing engine is missing required capabilities",
+            );
+            false
+        }
+        Err(error) => {
+            append_text_log(
+                log_dir,
+                "native",
+                &format!("capability check failed for existing engine: {error}"),
+            );
+            false
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn stop_processes_on_port(port: u16, log_dir: &Path) -> Result<(), AppError> {
+    let command = format!("netstat -ano | findstr LISTENING | findstr :{port}");
+    let output = Command::new("cmd").args(["/C", &command]).output()?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let pids: Vec<String> = stdout
+        .lines()
+        .filter_map(|line| line.split_whitespace().last().map(str::to_string))
+        .collect();
+
+    if pids.is_empty() {
+        append_text_log(log_dir, "native", "no stale engine pid found on target port");
+        return Ok(());
+    }
+
+    for pid in pids {
+        append_text_log(
+            log_dir,
+            "native",
+            &format!("stopping stale engine pid {pid} on port {port}"),
+        );
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid, "/F"])
+            .output();
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn stop_processes_on_port(port: u16, log_dir: &Path) -> Result<(), AppError> {
+    let command = format!("lsof -ti tcp:{port}");
+    let output = Command::new("sh").args(["-lc", &command]).output()?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let pids: Vec<String> = stdout
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect();
+
+    if pids.is_empty() {
+        append_text_log(log_dir, "native", "no stale engine pid found on target port");
+        return Ok(());
+    }
+
+    for pid in pids {
+        append_text_log(
+            log_dir,
+            "native",
+            &format!("stopping stale engine pid {pid} on port {port}"),
+        );
+        let _ = Command::new("kill").args(["-9", &pid]).output();
+    }
+
+    Ok(())
+}
+
+fn wait_for_port_to_close(port: u16, timeout: Duration, log_dir: &Path) -> bool {
+    let deadline = std::time::Instant::now() + timeout;
+
+    while std::time::Instant::now() < deadline {
+        if !is_port_reachable(port) {
+            append_text_log(log_dir, "native", &format!("port {port} is no longer reachable"));
+            return true;
+        }
+
+        std::thread::sleep(Duration::from_millis(200));
+    }
+
+    append_text_log(
+        log_dir,
+        "native",
+        &format!("timed out waiting for port {port} to close"),
+    );
+    false
+}
+
 fn wait_for_port(port: u16, timeout: Duration, log_dir: &Path) -> Result<(), AppError> {
     let address = SocketAddr::from(([127, 0, 0, 1], port));
     let deadline = std::time::Instant::now() + timeout;
@@ -144,15 +264,34 @@ fn spawn_sidecar(app_handle: &tauri::AppHandle, state: &SidecarState) -> Result<
     std::fs::create_dir_all(&model_dir)?;
 
     if is_port_reachable(ENGINE_PORT) {
+        if engine_supports_capabilities(ENGINE_PORT, &log_dir) {
+            append_text_log(
+                &log_dir,
+                "native",
+                &format!(
+                    "engine port {} is already reachable; reusing compatible engine",
+                    ENGINE_PORT
+                ),
+            );
+            return Ok(());
+        }
+
         append_text_log(
             &log_dir,
             "native",
             &format!(
-                "engine port {} is already reachable; skipping sidecar spawn",
+                "engine port {} is in use by an incompatible engine; stopping stale process",
                 ENGINE_PORT
             ),
         );
-        return Ok(());
+        stop_processes_on_port(ENGINE_PORT, &log_dir)?;
+
+        if !wait_for_port_to_close(ENGINE_PORT, Duration::from_secs(5), &log_dir) {
+            return Err(AppError::Message(
+                "A stale background engine is still using port 8000. Close the old app process and try again."
+                    .into(),
+            ));
+        }
     }
 
     append_text_log(

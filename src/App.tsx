@@ -106,6 +106,15 @@ export default function App() {
   const activeJob =
     jobs.find((job) => job.status === "running" || job.status === "queued") ??
     null;
+  const completedPreviewJob =
+    inputPath
+      ? jobs.find(
+          (job) =>
+            job.status === "completed" &&
+            job.inputPath === inputPath &&
+            Boolean(job.outputPath)
+        ) ?? null
+      : null;
   const completedJobs = jobs.filter((job) => job.status === "completed").length;
   const failedJobs = jobs.filter((job) => job.status === "failed").length;
   const activeBackend = (
@@ -486,6 +495,8 @@ export default function App() {
               {!isBootstrapping && currentView === "process" ? (
                 <ProcessView
                   activeJob={activeJob}
+                  comparisonOutputPath={completedPreviewJob?.outputPath ?? null}
+                  engineBaseUrl={bootstrap?.engineBaseUrl}
                   inputPath={inputPath}
                   onDownloadModel={handleDownloadModel}
                   onOutputFormatChange={setOutputFormat}

@@ -8,6 +8,8 @@ import type {
   EngineHealth,
   EngineSetupStatus,
   ProcessingJob,
+  WaveformComparison,
+  WaveformPreview,
 } from "@/lib/types";
 
 type EngineHealthWire = {
@@ -44,6 +46,17 @@ type ProcessingJobWire = {
   media_type: ProcessingJob["mediaType"];
   compute_backend: string | null;
   error: string | null;
+};
+
+type WaveformPreviewWire = {
+  points: number[];
+  duration_seconds: number;
+  peak_level: number;
+};
+
+type WaveformComparisonWire = {
+  before: WaveformPreviewWire;
+  after: WaveformPreviewWire | null;
 };
 
 async function logClientEvent(level: string, message: string) {
@@ -116,6 +129,23 @@ function toProcessingJob(payload: ProcessingJobWire): ProcessingJob {
     mediaType: payload.media_type,
     computeBackend: payload.compute_backend,
     error: payload.error,
+  };
+}
+
+function toWaveformPreview(payload: WaveformPreviewWire): WaveformPreview {
+  return {
+    points: payload.points,
+    durationSeconds: payload.duration_seconds,
+    peakLevel: payload.peak_level,
+  };
+}
+
+function toWaveformComparison(
+  payload: WaveformComparisonWire
+): WaveformComparison {
+  return {
+    before: toWaveformPreview(payload.before),
+    after: payload.after ? toWaveformPreview(payload.after) : null,
   };
 }
 
@@ -217,6 +247,23 @@ export function createEngineClient(engineBaseUrl?: string) {
         method: "POST",
       });
       return toProcessingJob(await readJson<ProcessingJobWire>(response));
+    },
+    async waveformPreview(inputPath: string, outputPath?: string | null) {
+      const response = await request(`${origin}/preview/waveform`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input_path: inputPath,
+          output_path: outputPath ?? null,
+          bins: 96,
+        }),
+      });
+
+      return toWaveformComparison(
+        await readJson<WaveformComparisonWire>(response)
+      );
     },
   };
 }

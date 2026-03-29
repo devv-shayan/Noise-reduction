@@ -64,6 +64,17 @@ export type ProcessingJob = {
   error: string | null;
 };
 
+export type WaveformPreview = {
+  points: number[];
+  durationSeconds: number;
+  peakLevel: number;
+};
+
+export type WaveformComparison = {
+  before: WaveformPreview;
+  after: WaveformPreview | null;
+};
+
 export type CreateJobInput = {
   inputPath: string;
   outputDir: string;

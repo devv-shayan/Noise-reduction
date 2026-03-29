@@ -17,6 +17,7 @@ from audio_engine import (
     ModelManager,
     ProcessingCancelledError,
     enhance_to_output,
+    waveform_preview_for_path,
 )
 from logging_config import configure_logging
 
@@ -111,6 +112,27 @@ class JobResponse(BaseModel):
     error: str | None
 
 
+class WaveformPreviewResponse(BaseModel):
+    points: list[float]
+    duration_seconds: float
+    peak_level: float
+
+
+class PreviewWaveformRequest(BaseModel):
+    input_path: str
+    output_path: str | None = None
+    bins: int = Field(default=96, ge=24, le=256)
+
+
+class PreviewWaveformResponse(BaseModel):
+    before: WaveformPreviewResponse
+    after: WaveformPreviewResponse | None
+
+
+class CapabilitiesResponse(BaseModel):
+    waveform_preview: bool
+
+
 def serialize_job(job: JobRecord) -> JobResponse:
     return JobResponse(**asdict(job))
 
@@ -189,6 +211,11 @@ def health_check() -> EngineHealthResponse:
         version=VERSION,
         model_ready=MODEL_MANAGER.status().ready,
     )
+
+
+@app.get("/capabilities", response_model=CapabilitiesResponse)
+def capabilities() -> CapabilitiesResponse:
+    return CapabilitiesResponse(waveform_preview=True)
 
 
 @app.get("/setup/status", response_model=SetupStatusResponse)
@@ -273,3 +300,38 @@ def cancel_job(job_id: str) -> JobResponse:
         cancel_event.set()
 
     return serialize_job(update_job(job_id, stage="cancelling"))
+
+
+@app.post("/preview/waveform", response_model=PreviewWaveformResponse)
+def preview_waveform(request: PreviewWaveformRequest) -> PreviewWaveformResponse:
+    input_path = Path(request.input_path).expanduser().resolve()
+    if not input_path.exists():
+        raise HTTPException(status_code=404, detail=f"Input file does not exist: {input_path}")
+
+    before_points, before_duration, before_peak = waveform_preview_for_path(
+        input_path,
+        request.bins,
+    )
+
+    after_preview: WaveformPreviewResponse | None = None
+    if request.output_path:
+        output_path = Path(request.output_path).expanduser().resolve()
+        if output_path.exists():
+            after_points, after_duration, after_peak = waveform_preview_for_path(
+                output_path,
+                request.bins,
+            )
+            after_preview = WaveformPreviewResponse(
+                points=after_points,
+                duration_seconds=after_duration,
+                peak_level=after_peak,
+            )
+
+    return PreviewWaveformResponse(
+        before=WaveformPreviewResponse(
+            points=before_points,
+            duration_seconds=before_duration,
+            peak_level=before_peak,
+        ),
+        after=after_preview,
+    )

@@ -9,6 +9,7 @@ from threading import Lock
 from typing import Callable
 
 import imageio_ffmpeg
+import numpy as np
 import soundfile as sf
 
 
@@ -136,6 +137,45 @@ def extract_input_to_wav(input_path: Path, temp_dir: Path) -> Path:
         )
 
     return temp_output_path
+
+
+def summarize_waveform(samples: np.ndarray, bins: int = 96) -> list[float]:
+    if samples.ndim > 1:
+        samples = samples.mean(axis=1)
+
+    if samples.size == 0:
+        return [0.0 for _ in range(bins)]
+
+    peaks: list[float] = []
+    sample_count = samples.shape[0]
+
+    for index in range(bins):
+        start = int(index * sample_count / bins)
+        end = int((index + 1) * sample_count / bins)
+        window = samples[start:end]
+
+        if window.size == 0:
+            peaks.append(0.0)
+            continue
+
+        amplitude = float(np.max(np.abs(window)))
+        peaks.append(round(min(amplitude, 1.0), 4))
+
+    return peaks
+
+
+def waveform_preview_for_path(input_path: Path, bins: int = 96) -> tuple[list[float], float, float]:
+    with tempfile.TemporaryDirectory(prefix="noise-preview-") as temp_dir_value:
+        temp_dir = Path(temp_dir_value)
+        normalized_input = extract_input_to_wav(input_path, temp_dir)
+        samples, sample_rate = sf.read(str(normalized_input), dtype="float32")
+
+        if getattr(samples, "ndim", 1) > 1:
+            samples = samples.mean(axis=1)
+
+        duration_seconds = float(samples.shape[0] / sample_rate) if sample_rate else 0.0
+        peak_level = float(np.max(np.abs(samples))) if samples.size else 0.0
+        return summarize_waveform(samples, bins), duration_seconds, round(min(peak_level, 1.0), 4)
 
 
 def enhance_to_output(

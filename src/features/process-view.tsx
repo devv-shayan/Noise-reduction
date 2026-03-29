@@ -1,3 +1,5 @@
+import { startTransition, useEffect, useState } from "react";
+
 import FileAudioIcon from "lucide-react/dist/esm/icons/file-audio.js";
 import FolderOpenIcon from "lucide-react/dist/esm/icons/folder-open.js";
 import HardDriveDownloadIcon from "lucide-react/dist/esm/icons/hard-drive-download.js";
@@ -5,6 +7,12 @@ import WandSparklesIcon from "lucide-react/dist/esm/icons/wand-sparkles.js";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import {
   Field,
   FieldContent,
@@ -27,16 +35,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
+import { createEngineClient } from "@/lib/engine-client";
 import type {
   AppSettings,
   EngineSetupStatus,
   OutputFormat,
   ProcessingJob,
+  WaveformComparison,
+  WaveformPreview,
 } from "@/lib/types";
 
 type ProcessViewProps = {
   activeJob: ProcessingJob | null;
+  comparisonOutputPath: string | null;
+  engineBaseUrl?: string;
   inputPath: string;
   onDownloadModel: () => Promise<void>;
   onOutputFormatChange: (format: OutputFormat) => void;
@@ -51,9 +64,6 @@ type ProcessViewProps = {
   settings: AppSettings;
 };
 
-const signalTrace =
-  "0,72 32,68 54,102 82,54 110,84 146,64 174,94 206,50 234,110 264,70 296,88 330,78 362,68 394,84 430,76 470,80 508,82 542,70 576,96 610,60 640,90";
-
 const nextSteps = [
   ["1", "Choose a file", "Pick the audio or video file you want to clean up."],
   ["2", "Choose where to save it", "Pick the folder where the cleaned file should go."],
@@ -65,8 +75,121 @@ function pathTail(path: string) {
   return path.split(/[/\\]/).pop() || path;
 }
 
+function formatDuration(durationSeconds: number) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return "0s";
+  }
+
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = Math.round(durationSeconds % 60);
+
+  if (!minutes) {
+    return `${seconds}s`;
+  }
+
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
+
+function getWaveformErrorMessage(error: unknown) {
+  const fallback = "Failed to generate the waveform preview.";
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (
+    (message.includes("/preview/waveform") &&
+      message.toLowerCase().includes("not found")) ||
+    message.includes('{"detail":"Not Found"}')
+  ) {
+    return "The app is still connected to an older background engine. Fully close the desktop app, make sure the old engine process stops, then open the app again.";
+  }
+
+  return fallback;
+}
+
+function waveformPolyline(points: number[]) {
+  if (!points.length) {
+    return "";
+  }
+
+  return points
+    .map((point, index) => {
+      const x = (index / (points.length - 1 || 1)) * 640;
+      const y = 90 - Math.max(0, Math.min(1, point)) * 68;
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
+
+function WaveformPanel({
+  emptyDescription,
+  emptyTitle,
+  isLoading,
+  label,
+  preview,
+}: {
+  emptyDescription: string;
+  emptyTitle: string;
+  isLoading: boolean;
+  label: string;
+  preview: WaveformPreview | null;
+}) {
+  return (
+    <div className="noise-panel-block">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h4 className="noise-panel-title">{label}</h4>
+          {isLoading ? (
+            <span className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+              <Spinner />
+              Loading
+            </span>
+          ) : null}
+        </div>
+
+        {preview ? (
+          <>
+            <div className="noise-signal-frame">
+              <svg
+                aria-label={`${label} waveform`}
+                className="noise-signal-svg"
+                preserveAspectRatio="none"
+                role="img"
+                viewBox="0 0 640 180"
+              >
+                <line x1="0" x2="640" y1="40" y2="40" />
+                <line x1="0" x2="640" y1="90" y2="90" />
+                <line x1="0" x2="640" y1="140" y2="140" />
+                <polyline points={waveformPolyline(preview.points)} />
+              </svg>
+            </div>
+
+            <div className="noise-list">
+              <div className="noise-list__row">
+                <span>Length</span>
+                <span>{formatDuration(preview.durationSeconds)}</span>
+              </div>
+              <div className="noise-list__row">
+                <span>Peak level</span>
+                <span>{Math.round(preview.peakLevel * 100)}%</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <Empty className="border-0 bg-transparent px-0 py-3">
+            <EmptyHeader>
+              <EmptyTitle>{emptyTitle}</EmptyTitle>
+              <EmptyDescription>{emptyDescription}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ProcessView({
   activeJob,
+  comparisonOutputPath,
+  engineBaseUrl,
   inputPath,
   onDownloadModel,
   onOutputFormatChange,
@@ -80,6 +203,10 @@ export function ProcessView({
   setupStatus,
   settings,
 }: ProcessViewProps) {
+  const [waveforms, setWaveforms] = useState<WaveformComparison | null>(null);
+  const [isWaveformLoading, setIsWaveformLoading] = useState(false);
+  const [waveformError, setWaveformError] = useState<string | null>(null);
+
   const canProcess = Boolean(
     inputPath && outputDirectory && setupStatus.modelReady && !setupStatus.loading
   );
@@ -106,6 +233,49 @@ export function ProcessView({
     ],
     ["SAVE FORMAT", outputFormat.toUpperCase()],
   ];
+
+  useEffect(() => {
+    if (!inputPath) {
+      setWaveforms(null);
+      setWaveformError(null);
+      setIsWaveformLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsWaveformLoading(true);
+    setWaveformError(null);
+
+    void createEngineClient(engineBaseUrl)
+      .waveformPreview(inputPath, comparisonOutputPath)
+      .then((nextWaveforms) => {
+        if (cancelled) {
+          return;
+        }
+
+        startTransition(() => {
+          setWaveforms(nextWaveforms);
+        });
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        const message = getWaveformErrorMessage(error);
+        setWaveforms(null);
+        setWaveformError(message);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsWaveformLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [comparisonOutputPath, engineBaseUrl, inputPath]);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_380px]">
@@ -281,43 +451,39 @@ export function ProcessView({
           <div className="flex flex-col gap-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="noise-panel-title">
-                  SOUND PREVIEW
-                </h3>
+                <h3 className="noise-panel-title">BEFORE AND AFTER PREVIEW</h3>
                 <p className="noise-panel-subtitle">
-                  A simple visual preview of the audio shape.
+                  These waveforms come from the selected file and the cleaned result.
                 </p>
               </div>
-              <span className="noise-kicker">PREVIEW</span>
+              <span className="noise-kicker">
+                {isWaveformLoading ? "LOADING" : "LIVE"}
+              </span>
             </div>
 
-            <div className="noise-signal-frame">
-              <svg
-                aria-hidden="true"
-                className="noise-signal-svg"
-                preserveAspectRatio="none"
-                viewBox="0 0 640 180"
-              >
-                <line x1="0" x2="640" y1="40" y2="40" />
-                <line x1="0" x2="640" y1="90" y2="90" />
-                <line x1="0" x2="640" y1="140" y2="140" />
-                <polyline points={signalTrace} />
-              </svg>
-            </div>
+            {waveformError ? (
+              <Alert variant="destructive">
+                <WandSparklesIcon />
+                <AlertTitle>Preview needs attention</AlertTitle>
+                <AlertDescription>{waveformError}</AlertDescription>
+              </Alert>
+            ) : null}
 
-            <div className="noise-meta-row noise-meta-row--stack">
-              <div className="noise-meta-item">
-                <span>LEVEL</span>
-                <span>MEDIUM</span>
-              </div>
-              <div className="noise-meta-item">
-                <span>DETAIL</span>
-                <span>CLEAR</span>
-              </div>
-              <div className="noise-meta-item">
-                <span>NOISE</span>
-                <span>{setupStatus.modelReady ? "LOW" : "SETUP NEEDED"}</span>
-              </div>
+            <div className="flex flex-col gap-4">
+              <WaveformPanel
+                emptyDescription="Choose a file to generate the original waveform."
+                emptyTitle="No file selected"
+                isLoading={isWaveformLoading && Boolean(inputPath)}
+                label="Before cleanup"
+                preview={waveforms?.before ?? null}
+              />
+              <WaveformPanel
+                emptyDescription="Run cleanup once and the cleaned waveform will appear here."
+                emptyTitle="No cleaned result yet"
+                isLoading={isWaveformLoading && Boolean(comparisonOutputPath)}
+                label="After cleanup"
+                preview={waveforms?.after ?? null}
+              />
             </div>
           </div>
         </section>
