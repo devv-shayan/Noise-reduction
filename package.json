@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "frontend:dev": "vite",
+    "dev": "npm run tauri:dev",
+    "frontend:build": "tsc && vite build",
+    "build": "npm run tauri:build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && cargo check --manifest-path src-tauri/Cargo.toml",

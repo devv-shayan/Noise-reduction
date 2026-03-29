@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.noise.reduction",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run frontend:dev",
+    "beforeBuildCommand": "npm run frontend:build",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
