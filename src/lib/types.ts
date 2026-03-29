@@ -68,11 +68,29 @@ export type WaveformPreview = {
   points: number[];
   durationSeconds: number;
   peakLevel: number;
+  rmsDb: number;
+  noiseFloorDb: number;
+  focusStartSeconds: number;
+  focusDurationSeconds: number;
+  clipDataUrl: string;
+};
+
+export type WaveformImprovement = {
+  verdict: string;
+  summary: string[];
+  noiseReductionDb: number;
+  loudnessChangeDb: number;
+  peakChangePercent: number;
+  clippingBefore: boolean;
+  clippingAfter: boolean;
+  focusStartSeconds: number;
+  focusDurationSeconds: number;
 };
 
 export type WaveformComparison = {
   before: WaveformPreview;
   after: WaveformPreview | null;
+  improvement: WaveformImprovement | null;
 };
 
 export type CreateJobInput = {

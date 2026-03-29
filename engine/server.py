@@ -116,6 +116,11 @@ class WaveformPreviewResponse(BaseModel):
     points: list[float]
     duration_seconds: float
     peak_level: float
+    rms_db: float
+    noise_floor_db: float
+    focus_start_seconds: float
+    focus_duration_seconds: float
+    clip_data_url: str
 
 
 class PreviewWaveformRequest(BaseModel):
@@ -127,6 +132,19 @@ class PreviewWaveformRequest(BaseModel):
 class PreviewWaveformResponse(BaseModel):
     before: WaveformPreviewResponse
     after: WaveformPreviewResponse | None
+    improvement: "WaveformImprovementResponse | None"
+
+
+class WaveformImprovementResponse(BaseModel):
+    verdict: str
+    summary: list[str]
+    noise_reduction_db: float
+    loudness_change_db: float
+    peak_change_percent: float
+    clipping_before: bool
+    clipping_after: bool
+    focus_start_seconds: float
+    focus_duration_seconds: float
 
 
 class CapabilitiesResponse(BaseModel):
@@ -302,36 +320,101 @@ def cancel_job(job_id: str) -> JobResponse:
     return serialize_job(update_job(job_id, stage="cancelling"))
 
 
+def build_waveform_response(preview) -> WaveformPreviewResponse:
+    return WaveformPreviewResponse(
+        points=preview.points,
+        duration_seconds=preview.duration_seconds,
+        peak_level=preview.peak_level,
+        rms_db=preview.rms_db,
+        noise_floor_db=preview.noise_floor_db,
+        focus_start_seconds=preview.focus_start_seconds,
+        focus_duration_seconds=preview.focus_duration_seconds,
+        clip_data_url=preview.clip_data_url,
+    )
+
+
+def build_improvement_response(before, after) -> WaveformImprovementResponse:
+    noise_reduction_db = round(before.noise_floor_db - after.noise_floor_db, 1)
+    loudness_change_db = round(after.rms_db - before.rms_db, 1)
+    peak_change_percent = round((before.peak_level - after.peak_level) * 100, 1)
+    clipping_before = before.peak_level >= 0.98
+    clipping_after = after.peak_level >= 0.98
+
+    if noise_reduction_db >= 6:
+        verdict = "Big improvement"
+    elif noise_reduction_db >= 3:
+        verdict = "Noticeable improvement"
+    elif noise_reduction_db >= 1.5:
+        verdict = "Small improvement"
+    elif noise_reduction_db > 0.3:
+        verdict = "Very small improvement"
+    else:
+        verdict = "Little change"
+
+    if noise_reduction_db > 0.3:
+        noise_summary = f"Estimated background noise was reduced by {noise_reduction_db:.1f} dB."
+    elif noise_reduction_db < -0.3:
+        noise_summary = f"Background noise appears slightly higher by {abs(noise_reduction_db):.1f} dB."
+    else:
+        noise_summary = "Background noise stayed about the same."
+
+    if abs(loudness_change_db) <= 1.5:
+        loudness_summary = "Overall volume stayed similar."
+    elif loudness_change_db > 1.5:
+        loudness_summary = "The cleaned audio sounds a bit louder."
+    else:
+        loudness_summary = "The cleaned audio sounds a bit softer."
+
+    if clipping_after:
+        peak_summary = "The cleaned preview still has very strong peaks."
+    elif peak_change_percent > 1.0:
+        peak_summary = f"Peak spikes are about {peak_change_percent:.1f}% lower in the cleaned preview."
+    else:
+        peak_summary = "No clipping detected in the cleaned preview."
+
+    return WaveformImprovementResponse(
+        verdict=verdict,
+        summary=[
+            noise_summary,
+            loudness_summary,
+            peak_summary,
+        ],
+        noise_reduction_db=noise_reduction_db,
+        loudness_change_db=loudness_change_db,
+        peak_change_percent=peak_change_percent,
+        clipping_before=clipping_before,
+        clipping_after=clipping_after,
+        focus_start_seconds=before.focus_start_seconds,
+        focus_duration_seconds=before.focus_duration_seconds,
+    )
+
+
 @app.post("/preview/waveform", response_model=PreviewWaveformResponse)
 def preview_waveform(request: PreviewWaveformRequest) -> PreviewWaveformResponse:
     input_path = Path(request.input_path).expanduser().resolve()
     if not input_path.exists():
         raise HTTPException(status_code=404, detail=f"Input file does not exist: {input_path}")
 
-    before_points, before_duration, before_peak = waveform_preview_for_path(
+    before_preview = waveform_preview_for_path(
         input_path,
         request.bins,
     )
 
-    after_preview: WaveformPreviewResponse | None = None
+    after_preview = None
     if request.output_path:
         output_path = Path(request.output_path).expanduser().resolve()
         if output_path.exists():
-            after_points, after_duration, after_peak = waveform_preview_for_path(
+            after_preview = waveform_preview_for_path(
                 output_path,
                 request.bins,
-            )
-            after_preview = WaveformPreviewResponse(
-                points=after_points,
-                duration_seconds=after_duration,
-                peak_level=after_peak,
+                focus_start_seconds=before_preview.focus_start_seconds,
+                focus_duration_seconds=before_preview.focus_duration_seconds,
             )
 
     return PreviewWaveformResponse(
-        before=WaveformPreviewResponse(
-            points=before_points,
-            duration_seconds=before_duration,
-            peak_level=before_peak,
-        ),
-        after=after_preview,
+        before=build_waveform_response(before_preview),
+        after=build_waveform_response(after_preview) if after_preview else None,
+        improvement=build_improvement_response(before_preview, after_preview)
+        if after_preview
+        else None,
     )

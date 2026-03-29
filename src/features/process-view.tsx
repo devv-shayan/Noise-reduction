@@ -1,8 +1,9 @@
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 
 import FileAudioIcon from "lucide-react/dist/esm/icons/file-audio.js";
 import FolderOpenIcon from "lucide-react/dist/esm/icons/folder-open.js";
 import HardDriveDownloadIcon from "lucide-react/dist/esm/icons/hard-drive-download.js";
+import PlayIcon from "lucide-react/dist/esm/icons/play.js";
 import WandSparklesIcon from "lucide-react/dist/esm/icons/wand-sparkles.js";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -36,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createEngineClient } from "@/lib/engine-client";
 import type {
   AppSettings,
@@ -90,6 +92,16 @@ function formatDuration(durationSeconds: number) {
   return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
+function formatClockTime(durationSeconds: number) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return "0:00";
+  }
+
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = Math.floor(durationSeconds % 60);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 function getWaveformErrorMessage(error: unknown) {
   const fallback = "Failed to generate the waveform preview.";
   const message = error instanceof Error ? error.message : String(error);
@@ -117,6 +129,17 @@ function waveformPolyline(points: number[]) {
       return `${x},${y}`;
     })
     .join(" ");
+}
+
+function focusRect(preview: WaveformPreview) {
+  const x = (preview.focusStartSeconds / Math.max(preview.durationSeconds, 0.001)) * 640;
+  const width =
+    (preview.focusDurationSeconds / Math.max(preview.durationSeconds, 0.001)) * 640;
+
+  return {
+    x: Math.max(0, Math.min(640, x)),
+    width: Math.max(18, Math.min(640 - x, width)),
+  };
 }
 
 function WaveformPanel({
@@ -158,6 +181,13 @@ function WaveformPanel({
                 <line x1="0" x2="640" y1="40" y2="40" />
                 <line x1="0" x2="640" y1="90" y2="90" />
                 <line x1="0" x2="640" y1="140" y2="140" />
+                <rect
+                  className="noise-waveform-focus"
+                  height="180"
+                  width={focusRect(preview).width}
+                  x={focusRect(preview).x}
+                  y="0"
+                />
                 <polyline points={waveformPolyline(preview.points)} />
               </svg>
             </div>
@@ -168,8 +198,13 @@ function WaveformPanel({
                 <span>{formatDuration(preview.durationSeconds)}</span>
               </div>
               <div className="noise-list__row">
-                <span>Peak level</span>
-                <span>{Math.round(preview.peakLevel * 100)}%</span>
+                <span>Best compare moment</span>
+                <span>
+                  {formatClockTime(preview.focusStartSeconds)} to{" "}
+                  {formatClockTime(
+                    preview.focusStartSeconds + preview.focusDurationSeconds
+                  )}
+                </span>
               </div>
             </div>
           </>
@@ -203,9 +238,14 @@ export function ProcessView({
   setupStatus,
   settings,
 }: ProcessViewProps) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const compareQueueRef = useRef<Array<"before" | "after">>([]);
+
   const [waveforms, setWaveforms] = useState<WaveformComparison | null>(null);
   const [isWaveformLoading, setIsWaveformLoading] = useState(false);
   const [waveformError, setWaveformError] = useState<string | null>(null);
+  const [selectedClip, setSelectedClip] = useState<"before" | "after">("before");
+  const [playerSource, setPlayerSource] = useState("");
 
   const canProcess = Boolean(
     inputPath && outputDirectory && setupStatus.modelReady && !setupStatus.loading
@@ -219,20 +259,48 @@ export function ProcessView({
     ["CURRENT JOB", activeJob ? activeJob.status.toUpperCase() : "NONE"],
     ["SELECTED FILE", inputPath ? pathTail(inputPath).toUpperCase() : "NONE"],
   ];
-  const operationLog = [
-    ["SELECTED FILE", inputPath ? pathTail(inputPath) : "No file selected yet"],
-    [
-      "APP SETUP",
-      setupStatus.modelReady
-        ? setupStatus.modelVersion ?? "Ready to use"
-        : "Needs one-time setup",
-    ],
-    [
-      "CURRENT STEP",
-      activeJob ? activeJob.stage.replace(/-/g, " ") : "Waiting for you to start",
-    ],
-    ["SAVE FORMAT", outputFormat.toUpperCase()],
-  ];
+  const detailRows = waveforms?.improvement
+    ? [
+        [
+          "NOISE CHANGE",
+          `${waveforms.improvement.noiseReductionDb.toFixed(1)} dB`,
+        ],
+        [
+          "LOUDNESS CHANGE",
+          `${waveforms.improvement.loudnessChangeDb >= 0 ? "+" : ""}${waveforms.improvement.loudnessChangeDb.toFixed(1)} dB`,
+        ],
+        [
+          "PEAK CHANGE",
+          `${waveforms.improvement.peakChangePercent >= 0 ? "-" : "+"}${Math.abs(waveforms.improvement.peakChangePercent).toFixed(1)}%`,
+        ],
+        [
+          "COMPARE MOMENT",
+          `${formatClockTime(waveforms.improvement.focusStartSeconds)} to ${formatClockTime(
+            waveforms.improvement.focusStartSeconds +
+              waveforms.improvement.focusDurationSeconds
+          )}`,
+        ],
+      ]
+    : [
+        ["SELECTED FILE", inputPath ? pathTail(inputPath) : "No file selected yet"],
+        [
+          "APP SETUP",
+          setupStatus.modelReady
+            ? setupStatus.modelVersion ?? "Ready to use"
+            : "Needs one-time setup",
+        ],
+        [
+          "CURRENT STEP",
+          activeJob
+            ? activeJob.stage.replace(/-/g, " ")
+            : "Waiting for you to start",
+        ],
+        ["SAVE FORMAT", outputFormat.toUpperCase()],
+      ];
+  const selectedPreview =
+    selectedClip === "after" && waveforms?.after
+      ? waveforms.after
+      : waveforms?.before ?? null;
 
   useEffect(() => {
     if (!inputPath) {
@@ -276,6 +344,68 @@ export function ProcessView({
       cancelled = true;
     };
   }, [comparisonOutputPath, engineBaseUrl, inputPath]);
+
+  useEffect(() => {
+    if (selectedClip === "after" && !waveforms?.after) {
+      setSelectedClip("before");
+    }
+  }, [selectedClip, waveforms?.after]);
+
+  useEffect(() => {
+    if (compareQueueRef.current.length > 0) {
+      return;
+    }
+
+    setPlayerSource(selectedPreview?.clipDataUrl ?? "");
+  }, [selectedPreview]);
+
+  function previewFor(kind: "before" | "after") {
+    if (kind === "after") {
+      return waveforms?.after ?? null;
+    }
+
+    return waveforms?.before ?? null;
+  }
+
+  function playSequence(sequence: Array<"before" | "after">) {
+    const available = sequence.filter((kind) => Boolean(previewFor(kind)));
+    if (!available.length || !audioRef.current) {
+      return;
+    }
+
+    const [first, ...rest] = available;
+    const firstPreview = previewFor(first);
+    if (!firstPreview) {
+      return;
+    }
+
+    compareQueueRef.current = rest;
+    setSelectedClip(first);
+    setPlayerSource(firstPreview.clipDataUrl);
+    audioRef.current.src = firstPreview.clipDataUrl;
+    audioRef.current.currentTime = 0;
+    void audioRef.current.play();
+  }
+
+  function handleAudioEnded() {
+    const next = compareQueueRef.current.shift();
+    if (!next || !audioRef.current) {
+      compareQueueRef.current = [];
+      return;
+    }
+
+    const preview = previewFor(next);
+    if (!preview) {
+      compareQueueRef.current = [];
+      return;
+    }
+
+    setSelectedClip(next);
+    setPlayerSource(preview.clipDataUrl);
+    audioRef.current.src = preview.clipDataUrl;
+    audioRef.current.currentTime = 0;
+    void audioRef.current.play();
+  }
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_380px]">
@@ -453,7 +583,7 @@ export function ProcessView({
               <div>
                 <h3 className="noise-panel-title">BEFORE AND AFTER PREVIEW</h3>
                 <p className="noise-panel-subtitle">
-                  These waveforms come from the selected file and the cleaned result.
+                  Listen to the same short moment before and after cleanup.
                 </p>
               </div>
               <span className="noise-kicker">
@@ -468,6 +598,139 @@ export function ProcessView({
                 <AlertDescription>{waveformError}</AlertDescription>
               </Alert>
             ) : null}
+
+            {waveforms?.improvement ? (
+              <div className="noise-result-summary">
+                <div>
+                  <p className="noise-kicker">CLEANUP RESULT</p>
+                  <h4 className="noise-result-summary__verdict">
+                    {waveforms.improvement.verdict}
+                  </h4>
+                </div>
+
+                <div className="noise-result-summary__metrics">
+                  <div className="noise-stat">
+                    <span className="noise-stat__label">Noise change</span>
+                    <span className="noise-stat__value">
+                      {waveforms.improvement.noiseReductionDb.toFixed(1)} dB
+                    </span>
+                  </div>
+                  <div className="noise-stat">
+                    <span className="noise-stat__label">Volume change</span>
+                    <span className="noise-stat__value">
+                      {waveforms.improvement.loudnessChangeDb >= 0 ? "+" : ""}
+                      {waveforms.improvement.loudnessChangeDb.toFixed(1)} dB
+                    </span>
+                  </div>
+                </div>
+
+                <div className="noise-result-summary__list">
+                  {waveforms.improvement.summary.map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="noise-panel-block">
+                <p className="noise-kicker">CLEANUP RESULT</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Run cleanup once to see a plain-language summary of how much the audio changed.
+                </p>
+              </div>
+            )}
+
+            <div className="noise-panel-block">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <h4 className="noise-panel-title">LISTEN TO THE DIFFERENCE</h4>
+                  <p className="noise-panel-subtitle">
+                    These short clips use the same moment and matched playback volume so the difference is easier to hear.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <ToggleGroup
+                    className="w-full justify-start"
+                    onValueChange={(value) => {
+                      if (!value) {
+                        return;
+                      }
+
+                      compareQueueRef.current = [];
+                      setSelectedClip(value as "before" | "after");
+                    }}
+                    type="single"
+                    value={selectedClip}
+                  >
+                    <ToggleGroupItem value="before">Before</ToggleGroupItem>
+                    <ToggleGroupItem disabled={!waveforms?.after} value="after">
+                      After
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() => playSequence(["before"])}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <PlayIcon data-icon="inline-start" />
+                      Play before
+                    </Button>
+                    <Button
+                      disabled={!waveforms?.after}
+                      onClick={() => playSequence(["after"])}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <PlayIcon data-icon="inline-start" />
+                      Play after
+                    </Button>
+                    <Button
+                      disabled={!waveforms?.after}
+                      onClick={() => playSequence(["before", "after"])}
+                      size="sm"
+                    >
+                      <PlayIcon data-icon="inline-start" />
+                      Compare
+                    </Button>
+                  </div>
+                </div>
+
+                {waveforms?.before ? (
+                  <p className="text-sm text-muted-foreground">
+                    Best comparison moment:{" "}
+                    <span className="font-medium text-foreground">
+                      {formatClockTime(waveforms.before.focusStartSeconds)} to{" "}
+                      {formatClockTime(
+                        waveforms.before.focusStartSeconds +
+                          waveforms.before.focusDurationSeconds
+                      )}
+                    </span>
+                  </p>
+                ) : null}
+
+                {selectedPreview ? (
+                  <audio
+                    key={playerSource}
+                    className="noise-audio-player"
+                    controls
+                    onEnded={handleAudioEnded}
+                    ref={audioRef}
+                    src={playerSource}
+                  />
+                ) : (
+                  <Empty className="border-0 bg-transparent px-0 py-0">
+                    <EmptyHeader>
+                      <EmptyTitle>No compare clip yet</EmptyTitle>
+                      <EmptyDescription>
+                        Choose a file first. After cleanup finishes, you can compare the same moment before and after.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                )}
+              </div>
+            </div>
 
             <div className="flex flex-col gap-4">
               <WaveformPanel
@@ -514,15 +777,15 @@ export function ProcessView({
 
             <div className="flex flex-col gap-4">
               <div>
-                <h3 className="noise-panel-title">CURRENT DETAILS</h3>
+                <h3 className="noise-panel-title">TECHNICAL DETAILS</h3>
                 <p className="noise-panel-subtitle">
-                  Helpful details about the file you selected and the current app state.
+                  Extra information for checking the cleanup result.
                 </p>
               </div>
               <div className="noise-log-list">
-                {operationLog.map(([label, value], index) => (
+                {detailRows.map(([label, value], index) => (
                   <div className="noise-log-row" key={label}>
-                    <span>{`14:02:${54 - index * 3}`}</span>
+                    <span>{`#0${index + 1}`}</span>
                     <span>{label}</span>
                     <span>{value}</span>
                   </div>

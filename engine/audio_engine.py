@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import base64
+import io
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -28,6 +30,18 @@ class ModelStatus:
     loading: bool
     last_error: str | None
     active_backend: str | None
+
+
+@dataclass(slots=True)
+class WaveformPreviewData:
+    points: list[float]
+    duration_seconds: float
+    peak_level: float
+    rms_db: float
+    noise_floor_db: float
+    focus_start_seconds: float
+    focus_duration_seconds: float
+    clip_data_url: str
 
 
 class ModelManager:
@@ -164,7 +178,90 @@ def summarize_waveform(samples: np.ndarray, bins: int = 96) -> list[float]:
     return peaks
 
 
-def waveform_preview_for_path(input_path: Path, bins: int = 96) -> tuple[list[float], float, float]:
+def rms_db(samples: np.ndarray) -> float:
+    if samples.size == 0:
+        return -90.0
+
+    rms = float(np.sqrt(np.mean(np.square(samples), dtype=np.float64)))
+    return round(20.0 * np.log10(max(rms, 1e-6)), 1)
+
+
+def noise_floor_db(samples: np.ndarray, sample_rate: int) -> float:
+    if samples.size == 0:
+        return -90.0
+
+    window_size = max(sample_rate // 20, 1)
+    floors: list[float] = []
+
+    for start in range(0, samples.shape[0], window_size):
+        window = samples[start : start + window_size]
+        if window.size == 0:
+            continue
+        floors.append(float(np.sqrt(np.mean(np.square(window), dtype=np.float64))))
+
+    if not floors:
+        return -90.0
+
+    floor_value = float(np.percentile(np.array(floors, dtype=np.float32), 20))
+    return round(20.0 * np.log10(max(floor_value, 1e-6)), 1)
+
+
+def find_focus_start(samples: np.ndarray, sample_rate: int, clip_duration_seconds: float) -> float:
+    if samples.size == 0:
+        return 0.0
+
+    clip_samples = max(int(sample_rate * clip_duration_seconds), 1)
+    if samples.shape[0] <= clip_samples:
+        return 0.0
+
+    hop_size = max(sample_rate // 2, 1)
+    best_index = 0
+    best_score = -1.0
+
+    for start in range(0, samples.shape[0] - clip_samples, hop_size):
+        segment = samples[start : start + clip_samples]
+        score = float(np.mean(np.abs(np.diff(segment))))
+        if score > best_score:
+            best_score = score
+            best_index = start
+
+    return round(best_index / sample_rate, 2)
+
+
+def clip_preview_segment(
+    samples: np.ndarray,
+    sample_rate: int,
+    start_seconds: float,
+    duration_seconds: float,
+) -> np.ndarray:
+    start_index = max(int(start_seconds * sample_rate), 0)
+    end_index = min(int((start_seconds + duration_seconds) * sample_rate), samples.shape[0])
+    return samples[start_index:end_index]
+
+
+def loudness_match_clip(samples: np.ndarray, target_rms: float = 0.12) -> np.ndarray:
+    if samples.size == 0:
+        return samples
+
+    current_rms = float(np.sqrt(np.mean(np.square(samples), dtype=np.float64)))
+    if current_rms <= 1e-6:
+        return samples
+
+    scaled = samples * (target_rms / current_rms)
+    peak = float(np.max(np.abs(scaled)))
+    if peak > 0.95:
+        scaled = scaled * (0.95 / peak)
+    return scaled.astype(np.float32)
+
+
+def wav_data_url(samples: np.ndarray, sample_rate: int) -> str:
+    buffer = io.BytesIO()
+    sf.write(buffer, samples, sample_rate, format="WAV", subtype="PCM_16")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:audio/wav;base64,{encoded}"
+
+
+def normalized_audio_for_path(input_path: Path) -> tuple[np.ndarray, int]:
     with tempfile.TemporaryDirectory(prefix="noise-preview-") as temp_dir_value:
         temp_dir = Path(temp_dir_value)
         normalized_input = extract_input_to_wav(input_path, temp_dir)
@@ -173,9 +270,36 @@ def waveform_preview_for_path(input_path: Path, bins: int = 96) -> tuple[list[fl
         if getattr(samples, "ndim", 1) > 1:
             samples = samples.mean(axis=1)
 
-        duration_seconds = float(samples.shape[0] / sample_rate) if sample_rate else 0.0
-        peak_level = float(np.max(np.abs(samples))) if samples.size else 0.0
-        return summarize_waveform(samples, bins), duration_seconds, round(min(peak_level, 1.0), 4)
+        return samples, sample_rate
+
+
+def waveform_preview_for_path(
+    input_path: Path,
+    bins: int = 96,
+    focus_start_seconds: float | None = None,
+    focus_duration_seconds: float = 3.5,
+) -> WaveformPreviewData:
+    samples, sample_rate = normalized_audio_for_path(input_path)
+    duration_seconds = float(samples.shape[0] / sample_rate) if sample_rate else 0.0
+    peak_level = float(np.max(np.abs(samples))) if samples.size else 0.0
+    resolved_focus_start = (
+        focus_start_seconds
+        if focus_start_seconds is not None
+        else find_focus_start(samples, sample_rate, focus_duration_seconds)
+    )
+    clip = clip_preview_segment(samples, sample_rate, resolved_focus_start, focus_duration_seconds)
+    matched_clip = loudness_match_clip(clip)
+
+    return WaveformPreviewData(
+        points=summarize_waveform(samples, bins),
+        duration_seconds=duration_seconds,
+        peak_level=round(min(peak_level, 1.0), 4),
+        rms_db=rms_db(samples),
+        noise_floor_db=noise_floor_db(samples, sample_rate),
+        focus_start_seconds=resolved_focus_start,
+        focus_duration_seconds=round(min(focus_duration_seconds, duration_seconds or focus_duration_seconds), 2),
+        clip_data_url=wav_data_url(matched_clip, sample_rate),
+    )
 
 
 def enhance_to_output(

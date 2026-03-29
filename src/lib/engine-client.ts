@@ -52,11 +52,27 @@ type WaveformPreviewWire = {
   points: number[];
   duration_seconds: number;
   peak_level: number;
+  rms_db: number;
+  noise_floor_db: number;
+  focus_start_seconds: number;
+  focus_duration_seconds: number;
+  clip_data_url: string;
 };
 
 type WaveformComparisonWire = {
   before: WaveformPreviewWire;
   after: WaveformPreviewWire | null;
+  improvement: {
+    verdict: string;
+    summary: string[];
+    noise_reduction_db: number;
+    loudness_change_db: number;
+    peak_change_percent: number;
+    clipping_before: boolean;
+    clipping_after: boolean;
+    focus_start_seconds: number;
+    focus_duration_seconds: number;
+  } | null;
 };
 
 async function logClientEvent(level: string, message: string) {
@@ -137,6 +153,11 @@ function toWaveformPreview(payload: WaveformPreviewWire): WaveformPreview {
     points: payload.points,
     durationSeconds: payload.duration_seconds,
     peakLevel: payload.peak_level,
+    rmsDb: payload.rms_db,
+    noiseFloorDb: payload.noise_floor_db,
+    focusStartSeconds: payload.focus_start_seconds,
+    focusDurationSeconds: payload.focus_duration_seconds,
+    clipDataUrl: payload.clip_data_url,
   };
 }
 
@@ -146,6 +167,19 @@ function toWaveformComparison(
   return {
     before: toWaveformPreview(payload.before),
     after: payload.after ? toWaveformPreview(payload.after) : null,
+    improvement: payload.improvement
+      ? {
+          verdict: payload.improvement.verdict,
+          summary: payload.improvement.summary,
+          noiseReductionDb: payload.improvement.noise_reduction_db,
+          loudnessChangeDb: payload.improvement.loudness_change_db,
+          peakChangePercent: payload.improvement.peak_change_percent,
+          clippingBefore: payload.improvement.clipping_before,
+          clippingAfter: payload.improvement.clipping_after,
+          focusStartSeconds: payload.improvement.focus_start_seconds,
+          focusDurationSeconds: payload.improvement.focus_duration_seconds,
+        }
+      : null,
   };
 }
 

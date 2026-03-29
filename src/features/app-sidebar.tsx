@@ -4,7 +4,6 @@ import AudioLinesIcon from "lucide-react/dist/esm/icons/audio-lines.js";
 import ListChecksIcon from "lucide-react/dist/esm/icons/list-checks.js";
 import Settings2Icon from "lucide-react/dist/esm/icons/settings-2.js";
 import ShieldCheckIcon from "lucide-react/dist/esm/icons/shield-check.js";
-import SparklesIcon from "lucide-react/dist/esm/icons/sparkles.js";
 
 import {
   Sidebar,
@@ -85,7 +84,6 @@ export function AppSidebar({
                 choose a page
               </p>
             </div>
-            <SparklesIcon />
           </div>
         </div>
       </SidebarHeader>

@@ -251,6 +251,42 @@ textarea {
   color: var(--muted-foreground);
 }
 
+.noise-result-summary {
+  border: 1px dotted var(--border);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.noise-result-summary__verdict {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  line-height: 1.05;
+}
+
+.noise-result-summary__metrics {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.noise-result-summary__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border-top: 1px dotted var(--border);
+  padding-top: 0.85rem;
+}
+
+.noise-result-summary__list p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}
+
 .noise-list {
   display: flex;
   flex-direction: column;
@@ -309,6 +345,10 @@ textarea {
   vector-effect: non-scaling-stroke;
 }
 
+.noise-waveform-focus {
+  fill: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
 .noise-matrix {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
@@ -337,6 +377,11 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+.noise-audio-player {
+  width: 100%;
+  height: 38px;
 }
 
 .noise-log-row {
@@ -675,6 +720,10 @@ textarea {
 
   .noise-signal-svg {
     height: 128px;
+  }
+
+  .noise-result-summary__metrics {
+    grid-template-columns: 1fr;
   }
 
   [data-slot="button"] {
