@@ -1,6 +1,6 @@
 use std::{
     fs::OpenOptions,
-    io::Write,
+    io::{Read, Write},
     net::{SocketAddr, TcpStream},
     path::Path,
     process::Command,
@@ -93,27 +93,36 @@ fn is_port_reachable(port: u16) -> bool {
     TcpStream::connect_timeout(&address, Duration::from_millis(250)).is_ok()
 }
 
-fn engine_supports_capabilities(port: u16, log_dir: &Path) -> bool {
-    let url = format!("http://127.0.0.1:{port}/capabilities");
-    let result = tauri::async_runtime::block_on(async {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(1))
-            .build()
-            .map_err(|error| error.to_string())?;
-        let response = client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|error| error.to_string())?;
-        Ok::<bool, String>(response.status().is_success())
-    });
+fn engine_http_get(port: u16, path: &str) -> Result<String, std::io::Error> {
+    let address = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(1))?;
+    stream.set_read_timeout(Some(Duration::from_secs(1)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(1)))?;
 
-    match result {
-        Ok(true) => {
-            append_text_log(log_dir, "native", "existing engine passed capability check");
+    let request = format!(
+        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+    );
+    stream.write_all(request.as_bytes())?;
+
+    let mut response = String::new();
+    stream.read_to_string(&mut response)?;
+    Ok(response)
+}
+
+fn engine_supports_capabilities(port: u16, log_dir: &Path) -> bool {
+    match engine_http_get(port, "/capabilities") {
+        Ok(response)
+            if (response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200"))
+                && response.contains("\"waveform_preview\":true") =>
+        {
+            append_text_log(
+                log_dir,
+                "native",
+                "existing engine passed capability check",
+            );
             true
         }
-        Ok(false) => {
+        Ok(_) => {
             append_text_log(
                 log_dir,
                 "native",
