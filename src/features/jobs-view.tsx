@@ -22,12 +22,12 @@ type JobsViewProps = {
 };
 
 const stageDescriptions = [
-  ["QUEUED", "Accepted by the engine and waiting for a worker."],
-  ["PREPARING", "Validating paths and preparing temporary files."],
-  ["EXTRACTING", "Extracting or decoding source audio when needed."],
-  ["RUNNING", "Enhancing the signal with LavaSR."],
-  ["ENCODING", "Writing the cleaned result to the selected format."],
-  ["FINAL", "Persisting the final path or an error summary."],
+  ["WAITING", "The app has your request and is about to start."],
+  ["GETTING READY", "The app is preparing the file and workspace."],
+  ["READING FILE", "The audio is being read from the source file."],
+  ["CLEANING AUDIO", "The cleanup model is improving the sound."],
+  ["SAVING FILE", "The cleaned result is being saved."],
+  ["DONE OR ISSUE", "The file is finished or needs your attention."],
 ];
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -57,15 +57,15 @@ function pathTail(path: string) {
 function statusCode(job: ProcessingJob) {
   switch (job.status) {
     case "completed":
-      return "OK";
+      return "DONE";
     case "failed":
-      return "ERR";
+      return "ISSUE";
     case "cancelled":
-      return "STOP";
+      return "STOPPED";
     case "running":
-      return "RUN";
+      return "RUNNING";
     default:
-      return "QUE";
+      return "WAITING";
   }
 }
 
@@ -84,13 +84,13 @@ export function JobsView({
             </EmptyMedia>
             <EmptyTitle>No jobs yet</EmptyTitle>
             <EmptyDescription>
-              Start a processing run from the Process view and the queue ledger
-              will appear here.
+              Start a cleanup from the Process page and your saved jobs will
+              appear here.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            Output paths, errors, and cancellation state are all persisted in
-            this log.
+            You will be able to review progress, saved files, and any problems
+            in one place.
           </EmptyContent>
         </Empty>
       </section>
@@ -109,23 +109,23 @@ export function JobsView({
       <section className="noise-panel px-6 py-6 md:px-8 md:py-7" data-motion="rise">
         <div className="flex flex-col gap-6">
           <div>
-            <p className="noise-kicker">JOB LEDGER // OUTPUT HISTORY</p>
+            <p className="noise-kicker">RECENT CLEANUPS</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-              Queue activity and export trace
+              Your cleanup history
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Each run is logged with its state, worker stage, backend, progress,
-              and final export path.
+              Each cleanup shows its progress, save location, and whether it
+              finished successfully.
             </p>
           </div>
 
           <div className="noise-meta-row">
             <div className="noise-meta-item">
-              <span>TRACKED</span>
+              <span>TOTAL</span>
               <span>{jobs.length}</span>
             </div>
             <div className="noise-meta-item">
-              <span>ACTIVE</span>
+              <span>IN PROGRESS</span>
               <span>{activeJobs}</span>
             </div>
             <div className="noise-meta-item">
@@ -140,17 +140,17 @@ export function JobsView({
 
           <div className="noise-table">
             <div className="noise-table__head">
-              <span>SOURCE</span>
+              <span>FILE</span>
               <span>STATE</span>
-              <span>STAGE</span>
-              <span>BACKEND</span>
+              <span>STEP</span>
+              <span>MODE</span>
               <span>UPDATED</span>
             </div>
 
             {jobs.map((job) => (
               <div className="noise-table__entry" key={job.id}>
                 <div className="noise-table__row">
-                  <div className="min-w-0">
+                  <div className="noise-table__primary min-w-0">
                     <p className="truncate font-medium uppercase">
                       {pathTail(job.inputPath)}
                     </p>
@@ -158,22 +158,30 @@ export function JobsView({
                       {job.inputPath}
                     </p>
                   </div>
-                  <span>{statusCode(job)}</span>
-                  <span>{formatStage(job.stage)}</span>
-                  <span>{job.computeBackend?.toUpperCase() ?? "PENDING"}</span>
-                  <span>{formatTimestamp(job.updatedAt)}</span>
+                  <div className="noise-table__field" data-label="State">
+                    <span>{statusCode(job)}</span>
+                  </div>
+                  <div className="noise-table__field" data-label="Step">
+                    <span>{formatStage(job.stage)}</span>
+                  </div>
+                  <div className="noise-table__field" data-label="Mode">
+                    <span>{job.computeBackend?.toUpperCase() ?? "PENDING"}</span>
+                  </div>
+                  <div className="noise-table__field" data-label="Updated">
+                    <span>{formatTimestamp(job.updatedAt)}</span>
+                  </div>
                 </div>
 
                 <div className="noise-table__detail">
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                      <span>{job.outputFormat.toUpperCase()}</span>
-                      <span>{job.progress}%</span>
-                    </div>
-                    <Progress value={job.progress} />
-                    {job.outputPath ? (
-                      <div className="noise-list__row">
-                        <span>OUTPUT</span>
+                      <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                        <span>{job.outputFormat.toUpperCase()}</span>
+                        <span>{job.progress}%</span>
+                      </div>
+                      <Progress value={job.progress} />
+                      {job.outputPath ? (
+                        <div className="noise-list__row">
+                        <span>SAVED FILE</span>
                         <span className="truncate">{job.outputPath}</span>
                       </div>
                     ) : null}
@@ -222,9 +230,9 @@ export function JobsView({
         >
           <div className="flex flex-col gap-5">
             <div>
-              <h3 className="noise-panel-title">LATEST QUEUE SNAPSHOT</h3>
+              <h3 className="noise-panel-title">CURRENT JOB</h3>
               <p className="noise-panel-subtitle">
-                Most recent job state and progress readout.
+                A simple summary of the most recent cleanup.
               </p>
             </div>
 
@@ -232,7 +240,7 @@ export function JobsView({
               <div className="noise-panel-block">
                 <div className="noise-list">
                   <div className="noise-list__row">
-                    <span>SOURCE</span>
+                    <span>FILE</span>
                     <span>{pathTail(latestJob.inputPath).toUpperCase()}</span>
                   </div>
                   <div className="noise-list__row">
@@ -240,7 +248,7 @@ export function JobsView({
                     <span>{statusCode(latestJob)}</span>
                   </div>
                   <div className="noise-list__row">
-                    <span>STAGE</span>
+                    <span>STEP</span>
                     <span>{formatStage(latestJob.stage)}</span>
                   </div>
                   <div className="noise-list__row">

@@ -169,6 +169,7 @@ textarea {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted-foreground);
+  text-wrap: balance;
 }
 
 .noise-meta-row {
@@ -182,6 +183,7 @@ textarea {
 
 .noise-meta-item {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   min-width: 0;
@@ -193,6 +195,10 @@ textarea {
 
 .noise-meta-item span:first-child {
   color: var(--muted-foreground);
+}
+
+.noise-meta-row--stack {
+  grid-template-columns: 1fr;
 }
 
 .noise-panel {
@@ -275,6 +281,7 @@ textarea {
 .noise-list__row span:last-child {
   min-width: 0;
   text-align: right;
+  text-wrap: pretty;
 }
 
 .noise-signal-frame {
@@ -377,11 +384,35 @@ textarea {
 }
 
 .noise-table__row {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.8rem;
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.noise-table__primary {
+  min-width: 0;
+}
+
+.noise-table__field {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  border-top: 1px dotted var(--border);
+  padding-top: 0.4rem;
+}
+
+.noise-table__field::before {
+  content: attr(data-label);
+  color: var(--muted-foreground);
+}
+
+.noise-table__field > span {
+  min-width: 0;
+  text-align: right;
 }
 
 .noise-table__detail {
@@ -553,13 +584,33 @@ textarea {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
+  .noise-meta-row--stack {
+    grid-template-columns: 1fr;
+  }
+
   .noise-table__head {
     display: grid;
   }
 
   .noise-table__row {
+    display: grid;
     grid-template-columns: minmax(0, 1.4fr) 80px 110px 110px 120px;
     align-items: start;
+  }
+
+  .noise-table__field {
+    display: block;
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .noise-table__field::before {
+    display: none;
+  }
+
+  .noise-table__field > span {
+    display: block;
+    text-align: left;
   }
 }
 
@@ -577,6 +628,11 @@ textarea {
     font-size: 1.7rem;
   }
 
+  .noise-wordmark__subtitle {
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+  }
+
   .noise-meta-row {
     grid-template-columns: 1fr;
   }
@@ -587,6 +643,46 @@ textarea {
 
   .noise-log-row span:last-child {
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .noise-panel {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .noise-panel-block {
+    padding: 0.85rem;
+  }
+
+  .noise-meta-item,
+  .noise-list__row {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .noise-meta-item span:last-child,
+  .noise-list__row span:last-child,
+  .noise-table__field > span {
+    text-align: left;
+  }
+
+  .noise-signal-frame {
+    min-height: 150px;
+    padding: 0.55rem;
+  }
+
+  .noise-signal-svg {
+    height: 128px;
+  }
+
+  [data-slot="button"] {
+    letter-spacing: 0.1em;
+  }
+
+  [data-slot="toggle-group"] {
+    width: 100%;
   }
 }
 

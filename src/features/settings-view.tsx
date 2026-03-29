@@ -45,13 +45,13 @@ export function SettingsView({
       <section className="noise-panel px-6 py-6 md:px-8 md:py-7" data-motion="rise">
         <div className="flex flex-col gap-6">
           <div>
-            <p className="noise-kicker">SYSTEM CONFIG // LOCAL RUNTIME</p>
+            <p className="noise-kicker">APP SETTINGS</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-              Theme, hardware, and cache control
+              Change the look and cleanup options
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Configure visual mode, choose the default compute preference, and
-              inspect the model cache used by the engine.
+              Choose how the app looks, how cleanup runs by default, and check
+              whether the setup files are ready.
             </p>
           </div>
 
@@ -62,10 +62,11 @@ export function SettingsView({
                   <FieldContent>
                     <FieldTitle>Theme</FieldTitle>
                     <FieldDescription>
-                      Switch between light, dark, or system-driven console mode.
+                      Pick the light, dark, or automatic look for the app.
                     </FieldDescription>
                   </FieldContent>
                   <ToggleGroup
+                    className="w-full flex-wrap"
                     onValueChange={(value) => {
                       if (!value) {
                         return;
@@ -79,15 +80,15 @@ export function SettingsView({
                     type="single"
                     value={theme ?? settings.theme}
                   >
-                    <ToggleGroupItem value="light">
+                    <ToggleGroupItem className="flex-1" value="light">
                       <SunIcon />
                       Light
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="dark">
+                    <ToggleGroupItem className="flex-1" value="dark">
                       <MoonIcon />
                       Dark
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="system">
+                    <ToggleGroupItem className="flex-1" value="system">
                       <SunMoonIcon />
                       System
                     </ToggleGroupItem>
@@ -100,12 +101,13 @@ export function SettingsView({
               <FieldGroup>
                 <Field orientation="responsive">
                   <FieldContent>
-                    <FieldTitle>Default compute mode</FieldTitle>
+                    <FieldTitle>Cleanup mode</FieldTitle>
                     <FieldDescription>
-                      Auto uses GPU when available and falls back to CPU otherwise.
+                      Auto chooses the best option. CPU is slower but works everywhere.
                     </FieldDescription>
                   </FieldContent>
                   <ToggleGroup
+                    className="w-full flex-wrap"
                     onValueChange={(value) => {
                       if (!value) {
                         return;
@@ -118,9 +120,9 @@ export function SettingsView({
                     type="single"
                     value={settings.computePreference}
                   >
-                    <ToggleGroupItem value="auto">Auto</ToggleGroupItem>
-                    <ToggleGroupItem value="cpu">CPU</ToggleGroupItem>
-                    <ToggleGroupItem value="gpu">GPU</ToggleGroupItem>
+                    <ToggleGroupItem className="flex-1" value="auto">Auto</ToggleGroupItem>
+                    <ToggleGroupItem className="flex-1" value="cpu">CPU</ToggleGroupItem>
+                    <ToggleGroupItem className="flex-1" value="gpu">GPU</ToggleGroupItem>
                   </ToggleGroup>
                 </Field>
               </FieldGroup>
@@ -131,29 +133,29 @@ export function SettingsView({
             <div className="noise-panel-block">
               <div className="flex flex-col gap-4">
                 <div>
-                  <h3 className="noise-panel-title">MODEL CACHE</h3>
+                  <h3 className="noise-panel-title">DOWNLOADED SETUP FILES</h3>
                   <p className="noise-panel-subtitle">
-                    Local weights and backend state used by the engine.
+                    These files let the app clean audio on this device.
                   </p>
                 </div>
 
                 <div className="noise-list">
                   <div className="noise-list__row">
-                    <span>STATUS</span>
-                    <span>{setupStatus.modelReady ? "READY" : "PENDING"}</span>
+                    <span>READY</span>
+                    <span>{setupStatus.modelReady ? "YES" : "NOT YET"}</span>
                   </div>
                   <div className="noise-list__row">
                     <span>VERSION</span>
                     <span>{setupStatus.modelVersion ?? "NOT DOWNLOADED"}</span>
                   </div>
                   <div className="noise-list__row">
-                    <span>PATH</span>
+                    <span>LOCATION</span>
                     <span className="truncate">
                       {setupStatus.cachePath || bootstrap?.paths.modelDir || "PENDING"}
                     </span>
                   </div>
                   <div className="noise-list__row">
-                    <span>BACKEND</span>
+                    <span>CLEANUP MODE</span>
                     <span>
                       {(setupStatus.activeBackend ?? settings.computePreference).toUpperCase()}
                     </span>
@@ -165,15 +167,14 @@ export function SettingsView({
             <div className="noise-panel-block">
               <div className="flex h-full flex-col justify-between gap-5">
                 <div>
-                  <h3 className="noise-panel-title">CACHE ACTION</h3>
+                  <h3 className="noise-panel-title">SETUP FILES</h3>
                   <p className="noise-panel-subtitle">
-                    Refresh the cached model if you need to recover from a partial
-                    download or replace local weights.
+                    Download the setup files again if something did not finish properly.
                   </p>
                 </div>
                 <Button onClick={() => void onDownloadModel()} size="sm" variant="outline">
                   <DownloadIcon data-icon="inline-start" />
-                  Refresh model cache
+                  Download again
                 </Button>
               </div>
             </div>
@@ -189,27 +190,27 @@ export function SettingsView({
         >
           <div className="flex flex-col gap-5">
             <div>
-              <h3 className="noise-panel-title">RELEASE CHANNEL</h3>
+              <h3 className="noise-panel-title">APP DETAILS</h3>
               <p className="noise-panel-subtitle">
-                Desktop updater, platform, and log path metadata.
+                Basic information about this copy of the app.
               </p>
             </div>
 
             <div className="noise-list">
               <div className="noise-list__row">
-                <span>APP_VERSION</span>
+                <span>VERSION</span>
                 <span>{bootstrap?.appVersion ?? "UNKNOWN"}</span>
               </div>
               <div className="noise-list__row">
-                <span>PLATFORM</span>
+                <span>DEVICE</span>
                 <span>{bootstrap?.platform ?? "UNKNOWN"}</span>
               </div>
               <div className="noise-list__row">
-                <span>UPDATER</span>
-                <span>{bootstrap?.updaterAvailable ? "ENABLED" : "DISABLED"}</span>
+                <span>UPDATES</span>
+                <span>{bootstrap?.updaterAvailable ? "AVAILABLE" : "OFF"}</span>
               </div>
               <div className="noise-list__row">
-                <span>LOGS</span>
+                <span>LOG FOLDER</span>
                 <span className="truncate">{bootstrap?.paths.logDir ?? "PENDING"}</span>
               </div>
             </div>

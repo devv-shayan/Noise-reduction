@@ -112,16 +112,15 @@ export default function App() {
     setupStatus.activeBackend ?? settings.computePreference
   ).toUpperCase();
   const systemStatus = appError
-    ? "FAULT"
+    ? "Needs attention"
     : setupStatus.loading
-      ? "SYNCING"
+      ? "Getting ready"
       : health.modelReady
-        ? "ONLINE"
-        : "STANDBY";
-  const locationCode = bootstrap?.platform?.toUpperCase() ?? "LOCAL";
-  const sessionCode = `TERM-${locationCode.slice(0, 4).padEnd(4, "X")}`;
-  const engineCode =
-    health.version === "0.0.0" ? "BOOT" : health.version.toUpperCase();
+        ? "Ready"
+        : "Setup needed";
+  const appVersion =
+    bootstrap?.appVersion?.toUpperCase() ??
+    (health.version === "0.0.0" ? "STARTING" : health.version.toUpperCase());
   const systemTime = `${utcTimeFormatter.format(clock)} UTC`;
 
   useEffect(() => {
@@ -393,17 +392,18 @@ export default function App() {
         <SidebarInset className="bg-transparent">
           <header className="sticky top-0 z-20 border-b border-border bg-background/96 px-4 py-4 backdrop-blur-sm md:px-6">
             <div className="noise-shell noise-header">
-              <div className="flex items-start justify-between gap-4">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-start">
                 <SidebarTrigger className="mt-1 shrink-0" />
                 <div className="flex min-w-0 flex-1 flex-col items-center text-center">
                   <div className="noise-wordmark" aria-label="Noise Reduction">
                     NOISE REDUCTION
                   </div>
                   <p className="noise-wordmark__subtitle">
-                    PROTOCOL CONTROL DASHBOARD
+                    SIMPLE AUDIO CLEANUP APP
                   </p>
                 </div>
                 <Button
+                  className="col-span-2 w-full sm:col-span-1 sm:w-auto"
                   disabled={isCheckingUpdates || !bootstrap?.updaterAvailable}
                   onClick={() => void handleCheckUpdates()}
                   size="sm"
@@ -414,33 +414,33 @@ export default function App() {
                   ) : (
                     <CpuIcon data-icon="inline-start" />
                   )}
-                  Sync
+                  Check updates
                 </Button>
               </div>
 
               <div className="noise-meta-row mt-4">
                 <div className="noise-meta-item">
-                  <span>SESSION</span>
-                  <span>{sessionCode}</span>
-                </div>
-                <div className="noise-meta-item">
-                  <span>LOC</span>
-                  <span>{locationCode}</span>
+                  <span>APP</span>
+                  <span>DESKTOP CLEANUP</span>
                 </div>
                 <div className="noise-meta-item">
                   <span>STATUS</span>
                   <span>{systemStatus}</span>
                 </div>
                 <div className="noise-meta-item">
-                  <span>ENGINE</span>
-                  <span>{engineCode}</span>
+                  <span>JOBS</span>
+                  <span>{jobs.length}</span>
                 </div>
                 <div className="noise-meta-item">
-                  <span>BACKEND</span>
+                  <span>CLEANUP</span>
                   <span>{activeBackend}</span>
                 </div>
                 <div className="noise-meta-item">
-                  <span>SYS_TIME</span>
+                  <span>VERSION</span>
+                  <span>{appVersion}</span>
+                </div>
+                <div className="noise-meta-item">
+                  <span>TIME</span>
                   <span>{systemTime}</span>
                 </div>
               </div>
@@ -464,7 +464,7 @@ export default function App() {
                 >
                   <div className="flex items-center gap-3 text-sm font-medium uppercase tracking-[0.18em]">
                     <Spinner />
-                    Bootstrap // local engine
+                    Starting the app
                   </div>
                   <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="flex flex-col gap-4">

@@ -54,12 +54,11 @@ type ProcessViewProps = {
 const signalTrace =
   "0,72 32,68 54,102 82,54 110,84 146,64 174,94 206,50 234,110 264,70 296,88 330,78 362,68 394,84 430,76 470,80 508,82 542,70 576,96 610,60 640,90";
 
-const densityMatrix = [
-  0, 1, 3, 2, 0, 1, 1, 2, 3, 0,
-  1, 2, 0, 3, 3, 2, 0, 1, 2, 1,
-  2, 3, 3, 0, 1, 1, 2, 3, 0, 2,
-  0, 1, 2, 0, 0, 3, 1, 2, 1, 3,
-  3, 2, 1, 0, 2, 0, 3, 1, 0, 1,
+const nextSteps = [
+  ["1", "Choose a file", "Pick the audio or video file you want to clean up."],
+  ["2", "Choose where to save it", "Pick the folder where the cleaned file should go."],
+  ["3", "Start cleanup", "The app cleans the audio on this device."],
+  ["4", "Open the result", "When it finishes, open the saved file from the Jobs page."],
 ];
 
 function pathTail(path: string) {
@@ -87,25 +86,25 @@ export function ProcessView({
   const currentBackend =
     setupStatus.activeBackend ?? settings.computePreference ?? "auto";
   const runtimeRows = [
-    ["MODEL", setupStatus.modelReady ? "READY" : "PENDING"],
-    ["BACKEND", currentBackend.toUpperCase()],
-    ["EXPORT", outputFormat.toUpperCase()],
-    ["QUEUE", activeJob ? activeJob.status.toUpperCase() : "IDLE"],
-    ["SOURCE", inputPath ? pathTail(inputPath).toUpperCase() : "WAITING"],
+    ["SETUP READY", setupStatus.modelReady ? "YES" : "NOT YET"],
+    ["CLEANUP MODE", currentBackend.toUpperCase()],
+    ["SAVE FORMAT", outputFormat.toUpperCase()],
+    ["CURRENT JOB", activeJob ? activeJob.status.toUpperCase() : "NONE"],
+    ["SELECTED FILE", inputPath ? pathTail(inputPath).toUpperCase() : "NONE"],
   ];
   const operationLog = [
-    ["SRC_PATH", inputPath ? pathTail(inputPath) : "Awaiting source media"],
+    ["SELECTED FILE", inputPath ? pathTail(inputPath) : "No file selected yet"],
     [
-      "CACHE_STATE",
+      "APP SETUP",
       setupStatus.modelReady
-        ? setupStatus.modelVersion ?? "Model ready"
-        : "Weights not cached",
+        ? setupStatus.modelVersion ?? "Ready to use"
+        : "Needs one-time setup",
     ],
     [
-      "ACTIVE_JOB",
-      activeJob ? activeJob.stage.replace(/-/g, " ") : "No worker claimed",
+      "CURRENT STEP",
+      activeJob ? activeJob.stage.replace(/-/g, " ") : "Waiting for you to start",
     ],
-    ["OUTPUT_FMT", outputFormat.toUpperCase()],
+    ["SAVE FORMAT", outputFormat.toUpperCase()],
   ];
 
   return (
@@ -113,29 +112,29 @@ export function ProcessView({
       <section className="noise-panel px-6 py-6 md:px-8 md:py-7" data-motion="rise">
         <div className="flex flex-col gap-6">
           <div>
-            <p className="noise-kicker">PROCESS CONSOLE // INPUT ROUTING</p>
+            <p className="noise-kicker">START CLEANUP</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-              Source file and export destination
+              Choose a file and where to save it
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Load one media file, point the export to a local folder, and run
-              the cleanup chain through the desktop engine.
+              Pick one file, choose a save folder, and let the app clean up the
+              audio for you.
             </p>
           </div>
 
           {!setupStatus.modelReady ? (
             <Alert>
               <WandSparklesIcon />
-              <AlertTitle>Model setup required</AlertTitle>
+              <AlertTitle>One quick setup step</AlertTitle>
               <AlertDescription className="flex flex-col gap-3">
                 <span>
-                  The first run downloads LavaSR into the local cache so later
-                  runs can stay offline.
+                  The app needs to download its cleanup model once. After that,
+                  it works locally on this device.
                 </span>
                 <div>
                   <Button onClick={() => void onDownloadModel()} size="sm">
                     <HardDriveDownloadIcon data-icon="inline-start" />
-                    Download model
+                    Download setup files
                   </Button>
                 </div>
               </AlertDescription>
@@ -147,14 +146,14 @@ export function ProcessView({
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="font-medium uppercase tracking-[0.14em]">
-                    Preparing local cache
+                    Getting things ready
                   </span>
-                  <span className="text-muted-foreground">Background task</span>
+                  <span className="text-muted-foreground">One-time setup</span>
                 </div>
                 <Progress value={45} />
                 <p className="text-sm text-muted-foreground">
-                  This usually happens once per machine. The workspace will stay
-                  ready after the cache is complete.
+                  This usually happens once. The app will be ready to use after
+                  the download finishes.
                 </p>
               </div>
             </div>
@@ -163,7 +162,7 @@ export function ProcessView({
           {setupStatus.lastError ? (
             <Alert variant="destructive">
               <WandSparklesIcon />
-              <AlertTitle>Model setup reported an error</AlertTitle>
+              <AlertTitle>Setup needs attention</AlertTitle>
               <AlertDescription>{setupStatus.lastError}</AlertDescription>
             </Alert>
           ) : null}
@@ -172,16 +171,16 @@ export function ProcessView({
             <FieldGroup className="gap-6">
               <Field>
                 <FieldContent>
-                  <FieldLabel htmlFor="input-path">Input media</FieldLabel>
+                  <FieldLabel htmlFor="input-path">File to clean</FieldLabel>
                   <FieldDescription>
-                    Accepts WAV, MP3, M4A, FLAC, MP4, MOV, MKV, and AVI.
+                    You can choose common audio and video file types.
                   </FieldDescription>
                 </FieldContent>
                 <InputGroup>
                   <InputGroupInput
                     id="input-path"
                     onChange={(event) => setInputPath(event.target.value)}
-                    placeholder="Select source media"
+                    placeholder="Choose a file"
                     value={inputPath}
                   />
                   <InputGroupAddon align="inline-end">
@@ -194,16 +193,16 @@ export function ProcessView({
 
               <Field>
                 <FieldContent>
-                  <FieldLabel htmlFor="output-directory">Output folder</FieldLabel>
+                  <FieldLabel htmlFor="output-directory">Save cleaned file to</FieldLabel>
                   <FieldDescription>
-                    The cleaned audio file is written here after processing.
+                    Pick the folder where the cleaned file should be saved.
                   </FieldDescription>
                 </FieldContent>
                 <InputGroup>
                   <InputGroupInput
                     id="output-directory"
                     onChange={(event) => setOutputDirectory(event.target.value)}
-                    placeholder="Select export directory"
+                    placeholder="Choose a folder"
                     value={outputDirectory}
                   />
                   <InputGroupAddon align="inline-end">
@@ -222,8 +221,8 @@ export function ProcessView({
                 <FieldContent>
                   <FieldTitle>Export format</FieldTitle>
                   <FieldDescription>
-                    WAV is the safest default. FLAC keeps the export lossless
-                    with smaller file size.
+                    WAV is the simplest choice. FLAC keeps the same quality with
+                    smaller files.
                   </FieldDescription>
                 </FieldContent>
                 <Select
@@ -247,9 +246,9 @@ export function ProcessView({
 
             <div className="noise-panel-block flex flex-col gap-5">
               <div>
-                <p className="noise-kicker">RESOURCE MATRIX</p>
+                <p className="noise-kicker">READY TO CLEAN</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Active runtime values reported by the local engine.
+                  A quick summary before you start.
                 </p>
               </div>
 
@@ -266,7 +265,7 @@ export function ProcessView({
                 disabled={!canProcess || Boolean(activeJob)}
                 onClick={() => void onStartProcessing()}
               >
-                {activeJob ? "JOB ALREADY RUNNING" : "START CLEANUP"}
+                {activeJob ? "CLEANUP IN PROGRESS" : "START CLEANUP"}
               </Button>
             </div>
           </div>
@@ -283,13 +282,13 @@ export function ProcessView({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="noise-panel-title">
-                  SIGNAL TOPOLOGY // FREQUENCY OUTPUT
+                  SOUND PREVIEW
                 </h3>
                 <p className="noise-panel-subtitle">
-                  Static trace reference for the current cleanup chain.
+                  A simple visual preview of the audio shape.
                 </p>
               </div>
-              <span className="noise-kicker">HZ/MS</span>
+              <span className="noise-kicker">PREVIEW</span>
             </div>
 
             <div className="noise-signal-frame">
@@ -306,18 +305,18 @@ export function ProcessView({
               </svg>
             </div>
 
-            <div className="noise-meta-row grid-cols-3">
+            <div className="noise-meta-row noise-meta-row--stack">
               <div className="noise-meta-item">
-                <span>AMP</span>
-                <span>1.2V</span>
+                <span>LEVEL</span>
+                <span>MEDIUM</span>
               </div>
               <div className="noise-meta-item">
-                <span>FREQ</span>
-                <span>2.4GHZ</span>
+                <span>DETAIL</span>
+                <span>CLEAR</span>
               </div>
               <div className="noise-meta-item">
                 <span>NOISE</span>
-                <span>{setupStatus.modelReady ? "LOW" : "PENDING"}</span>
+                <span>{setupStatus.modelReady ? "LOW" : "SETUP NEEDED"}</span>
               </div>
             </div>
           </div>
@@ -328,26 +327,30 @@ export function ProcessView({
           data-motion="rise"
           data-motion-delay="2"
         >
-          <div className="grid gap-6 md:grid-cols-[1fr_1.1fr]">
+          <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-1">
             <div className="flex flex-col gap-4">
               <div>
-                <h3 className="noise-panel-title">NODE SECTOR DENSITY</h3>
+                <h3 className="noise-panel-title">WHAT HAPPENS NEXT</h3>
                 <p className="noise-panel-subtitle">
-                  Synthetic grid used as a visual density readout.
+                  The app follows these steps after you press start.
                 </p>
               </div>
-              <div className="noise-matrix" aria-hidden="true">
-                {densityMatrix.map((tone, index) => (
-                  <span data-tone={tone} key={index} />
+              <div className="noise-log-list">
+                {nextSteps.map(([step, title, description]) => (
+                  <div className="noise-log-row" key={step}>
+                    <span>{step}</span>
+                    <span>{title}</span>
+                    <span>{description}</span>
+                  </div>
                 ))}
               </div>
             </div>
 
             <div className="flex flex-col gap-4">
               <div>
-                <h3 className="noise-panel-title">SYSTEM EVENT LOG</h3>
+                <h3 className="noise-panel-title">CURRENT DETAILS</h3>
                 <p className="noise-panel-subtitle">
-                  Current source, cache, and queue values for the active run.
+                  Helpful details about the file you selected and the current app state.
                 </p>
               </div>
               <div className="noise-log-list">
