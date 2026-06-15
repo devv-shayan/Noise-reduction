@@ -1,0 +1,94 @@
+name: Release
+
+# Build native installers for every OS and attach them to a GitHub Release.
+# Trigger by pushing a version tag, e.g.:  git tag v0.1.0 && git push origin v0.1.0
+# You can also run it manually from the Actions tab (workflow_dispatch).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS (Apple Silicon)
+            args: "--target aarch64-apple-darwin"
+          - os: macos-13
+            label: macOS (Intel)
+            args: "--target x86_64-apple-darwin"
+          - os: ubuntu-22.04
+            label: Linux
+            args: ""
+          - os: windows-latest
+            label: Windows
+            args: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev \
+            build-essential \
+            curl wget file libssl-dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin' || matrix.os == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Set up uv (Python)
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Install Python engine
+        run: npm run engine:install
+
+      - name: Build engine sidecar
+        run: npm run engine:build
+
+      - name: Build app and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.0.0-dev' }}
+          releaseName: "Noise Reduction ${{ github.ref_type == 'tag' && github.ref_name || 'dev build' }}"
+          releaseBody: "Download the installer for your platform from the assets below. Installers are unsigned — Windows SmartScreen / macOS Gatekeeper may warn on first launch."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
