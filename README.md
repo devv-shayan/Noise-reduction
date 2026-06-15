@@ -4,6 +4,19 @@ A local, privacy‑first desktop app for AI‑powered audio cleanup. Drop in a n
 
 ---  
 
+## 🎧 Hear the Difference  
+
+A real before/after example produced by the app — same clip, noise removed. Click to download and listen (GitHub doesn't play `.wav` inline):
+
+| | Sample |
+|--------|--------|
+| 🔊 **Before** (noisy) | [`8-speaker-before.wav`](samples/8-speaker-before.wav) |
+| ✨ **After** (cleaned) | [`8-speaker-after-cleaned.wav`](samples/8-speaker-after-cleaned.wav) |
+
+> Tip: download both and play them back to back to hear the background noise drop out while the speech stays clear.
+
+---  
+
 ## 🎯 Overview  
 
 Noise Reduction is a cross‑platform desktop application built on the Tauri sidecar pattern that:
