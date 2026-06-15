@@ -144,22 +144,6 @@ export function SettingsView({
                     <span>READY</span>
                     <span>{setupStatus.modelReady ? "YES" : "NOT YET"}</span>
                   </div>
-                  <div className="noise-list__row">
-                    <span>VERSION</span>
-                    <span>{setupStatus.modelVersion ?? "NOT DOWNLOADED"}</span>
-                  </div>
-                  <div className="noise-list__row">
-                    <span>LOCATION</span>
-                    <span className="truncate">
-                      {setupStatus.cachePath || bootstrap?.paths.modelDir || "PENDING"}
-                    </span>
-                  </div>
-                  <div className="noise-list__row">
-                    <span>CLEANUP MODE</span>
-                    <span>
-                      {(setupStatus.activeBackend ?? settings.computePreference).toUpperCase()}
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -202,16 +186,8 @@ export function SettingsView({
                 <span>{bootstrap?.appVersion ?? "UNKNOWN"}</span>
               </div>
               <div className="noise-list__row">
-                <span>DEVICE</span>
-                <span>{bootstrap?.platform ?? "UNKNOWN"}</span>
-              </div>
-              <div className="noise-list__row">
                 <span>UPDATES</span>
                 <span>{bootstrap?.updaterAvailable ? "AVAILABLE" : "OFF"}</span>
-              </div>
-              <div className="noise-list__row">
-                <span>LOG FOLDER</span>
-                <span className="truncate">{bootstrap?.paths.logDir ?? "PENDING"}</span>
               </div>
             </div>
 

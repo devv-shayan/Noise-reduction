@@ -40,7 +40,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createEngineClient } from "@/lib/engine-client";
 import type {
-  AppSettings,
   EngineSetupStatus,
   OutputFormat,
   ProcessingJob,
@@ -63,7 +62,6 @@ type ProcessViewProps = {
   setInputPath: (value: string) => void;
   setOutputDirectory: (value: string) => void;
   setupStatus: EngineSetupStatus;
-  settings: AppSettings;
 };
 
 const nextSteps = [
@@ -236,7 +234,6 @@ export function ProcessView({
   setInputPath,
   setOutputDirectory,
   setupStatus,
-  settings,
 }: ProcessViewProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const compareQueueRef = useRef<Array<"before" | "after">>([]);
@@ -250,53 +247,10 @@ export function ProcessView({
   const canProcess = Boolean(
     inputPath && outputDirectory && setupStatus.modelReady && !setupStatus.loading
   );
-  const currentBackend =
-    setupStatus.activeBackend ?? settings.computePreference ?? "auto";
   const runtimeRows = [
-    ["SETUP READY", setupStatus.modelReady ? "YES" : "NOT YET"],
-    ["CLEANUP MODE", currentBackend.toUpperCase()],
-    ["SAVE FORMAT", outputFormat.toUpperCase()],
-    ["CURRENT JOB", activeJob ? activeJob.status.toUpperCase() : "NONE"],
     ["SELECTED FILE", inputPath ? pathTail(inputPath).toUpperCase() : "NONE"],
+    ["SAVE FORMAT", outputFormat.toUpperCase()],
   ];
-  const detailRows = waveforms?.improvement
-    ? [
-        [
-          "NOISE CHANGE",
-          `${waveforms.improvement.noiseReductionDb.toFixed(1)} dB`,
-        ],
-        [
-          "LOUDNESS CHANGE",
-          `${waveforms.improvement.loudnessChangeDb >= 0 ? "+" : ""}${waveforms.improvement.loudnessChangeDb.toFixed(1)} dB`,
-        ],
-        [
-          "PEAK CHANGE",
-          `${waveforms.improvement.peakChangePercent >= 0 ? "-" : "+"}${Math.abs(waveforms.improvement.peakChangePercent).toFixed(1)}%`,
-        ],
-        [
-          "COMPARE MOMENT",
-          `${formatClockTime(waveforms.improvement.focusStartSeconds)} to ${formatClockTime(
-            waveforms.improvement.focusStartSeconds +
-              waveforms.improvement.focusDurationSeconds
-          )}`,
-        ],
-      ]
-    : [
-        ["SELECTED FILE", inputPath ? pathTail(inputPath) : "No file selected yet"],
-        [
-          "APP SETUP",
-          setupStatus.modelReady
-            ? setupStatus.modelVersion ?? "Ready to use"
-            : "Needs one-time setup",
-        ],
-        [
-          "CURRENT STEP",
-          activeJob
-            ? activeJob.stage.replace(/-/g, " ")
-            : "Waiting for you to start",
-        ],
-        ["SAVE FORMAT", outputFormat.toUpperCase()],
-      ];
   const selectedPreview =
     selectedClip === "after" && waveforms?.after
       ? waveforms.after
@@ -608,22 +562,6 @@ export function ProcessView({
                   </h4>
                 </div>
 
-                <div className="noise-result-summary__metrics">
-                  <div className="noise-stat">
-                    <span className="noise-stat__label">Noise change</span>
-                    <span className="noise-stat__value">
-                      {waveforms.improvement.noiseReductionDb.toFixed(1)} dB
-                    </span>
-                  </div>
-                  <div className="noise-stat">
-                    <span className="noise-stat__label">Volume change</span>
-                    <span className="noise-stat__value">
-                      {waveforms.improvement.loudnessChangeDb >= 0 ? "+" : ""}
-                      {waveforms.improvement.loudnessChangeDb.toFixed(1)} dB
-                    </span>
-                  </div>
-                </div>
-
                 <div className="noise-result-summary__list">
                   {waveforms.improvement.summary.map((item) => (
                     <p key={item}>{item}</p>
@@ -756,41 +694,21 @@ export function ProcessView({
           data-motion="rise"
           data-motion-delay="2"
         >
-          <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-1">
-            <div className="flex flex-col gap-4">
-              <div>
-                <h3 className="noise-panel-title">WHAT HAPPENS NEXT</h3>
-                <p className="noise-panel-subtitle">
-                  The app follows these steps after you press start.
-                </p>
-              </div>
-              <div className="noise-log-list">
-                {nextSteps.map(([step, title, description]) => (
-                  <div className="noise-log-row" key={step}>
-                    <span>{step}</span>
-                    <span>{title}</span>
-                    <span>{description}</span>
-                  </div>
-                ))}
-              </div>
+          <div className="flex flex-col gap-4">
+            <div>
+              <h3 className="noise-panel-title">WHAT HAPPENS NEXT</h3>
+              <p className="noise-panel-subtitle">
+                The app follows these steps after you press start.
+              </p>
             </div>
-
-            <div className="flex flex-col gap-4">
-              <div>
-                <h3 className="noise-panel-title">TECHNICAL DETAILS</h3>
-                <p className="noise-panel-subtitle">
-                  Extra information for checking the cleanup result.
-                </p>
-              </div>
-              <div className="noise-log-list">
-                {detailRows.map(([label, value], index) => (
-                  <div className="noise-log-row" key={label}>
-                    <span>{`#0${index + 1}`}</span>
-                    <span>{label}</span>
-                    <span>{value}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="noise-log-list">
+              {nextSteps.map(([step, title, description]) => (
+                <div className="noise-log-row" key={step}>
+                  <span>{step}</span>
+                  <span>{title}</span>
+                  <span>{description}</span>
+                </div>
+              ))}
             </div>
           </div>
         </section>

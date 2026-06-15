@@ -55,14 +55,6 @@ const emptySetupStatus: EngineSetupStatus = {
   lastError: null,
 };
 
-const utcTimeFormatter = new Intl.DateTimeFormat("en-GB", {
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-  timeZone: "UTC",
-});
-
 function mergeJobState(previous: ProcessingJob[], next: ProcessingJob) {
   const remaining = previous.filter((job) => job.id !== next.id);
   return [next, ...remaining].sort(
@@ -101,7 +93,6 @@ export default function App() {
   const [outputFormat, setOutputFormat] = useState<OutputFormat>(
     settings.defaultOutputFormat
   );
-  const [clock, setClock] = useState(() => new Date());
 
   const activeJob =
     jobs.find((job) => job.status === "running" || job.status === "queued") ??
@@ -117,9 +108,6 @@ export default function App() {
       : null;
   const completedJobs = jobs.filter((job) => job.status === "completed").length;
   const failedJobs = jobs.filter((job) => job.status === "failed").length;
-  const activeBackend = (
-    setupStatus.activeBackend ?? settings.computePreference
-  ).toUpperCase();
   const systemStatus = appError
     ? "Needs attention"
     : setupStatus.loading
@@ -127,20 +115,6 @@ export default function App() {
       : health.modelReady
         ? "Ready"
         : "Setup needed";
-  const appVersion =
-    bootstrap?.appVersion?.toUpperCase() ??
-    (health.version === "0.0.0" ? "STARTING" : health.version.toUpperCase());
-  const systemTime = `${utcTimeFormatter.format(clock)} UTC`;
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setClock(new Date());
-    }, 1000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, []);
 
   useEffect(() => {
     saveSettings(settings);
@@ -429,28 +403,12 @@ export default function App() {
 
               <div className="noise-meta-row mt-4">
                 <div className="noise-meta-item">
-                  <span>APP</span>
-                  <span>DESKTOP CLEANUP</span>
-                </div>
-                <div className="noise-meta-item">
                   <span>STATUS</span>
                   <span>{systemStatus}</span>
                 </div>
                 <div className="noise-meta-item">
                   <span>JOBS</span>
                   <span>{jobs.length}</span>
-                </div>
-                <div className="noise-meta-item">
-                  <span>CLEANUP</span>
-                  <span>{activeBackend}</span>
-                </div>
-                <div className="noise-meta-item">
-                  <span>VERSION</span>
-                  <span>{appVersion}</span>
-                </div>
-                <div className="noise-meta-item">
-                  <span>TIME</span>
-                  <span>{systemTime}</span>
                 </div>
               </div>
             </div>
@@ -508,7 +466,6 @@ export default function App() {
                   setInputPath={setInputPath}
                   setOutputDirectory={setOutputDirectory}
                   setupStatus={setupStatus}
-                  settings={settings}
                 />
               ) : null}
 
