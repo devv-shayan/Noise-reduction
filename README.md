@@ -6,14 +6,18 @@ A local, privacy‑first desktop app for AI‑powered audio cleanup. Drop in a n
 
 ## 🎧 Hear the Difference  
 
-A real before/after example produced by the app — same clip, noise removed. Click to download and listen (GitHub doesn't play `.wav` inline):
+A real before/after example produced by the app — same clip, background noise removed locally.
+
+### ▶️ [**Play the live before/after demo →**](https://devv-shayan.github.io/Noise-reduction/)
+
+Press play on each track right in your browser (hosted from this repo via GitHub Pages — nothing downloads).
+
+Prefer the raw files? Download them directly:
 
 | | Sample |
 |--------|--------|
-| 🔊 **Before** (noisy) | [`8-speaker-before.wav`](samples/8-speaker-before.wav) |
-| ✨ **After** (cleaned) | [`8-speaker-after-cleaned.wav`](samples/8-speaker-after-cleaned.wav) |
-
-> Tip: download both and play them back to back to hear the background noise drop out while the speech stays clear.
+| 🔊 **Before** (noisy) | [`8-speaker-before.wav`](docs/8-speaker-before.wav) |
+| ✨ **After** (cleaned) | [`8-speaker-after-cleaned.wav`](docs/8-speaker-after-cleaned.wav) |
 
 ---  
 

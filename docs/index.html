@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Noise Reduction — Before / After Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d10;
+        --panel: #14181d;
+        --border: #232a31;
+        --text: #e7edf3;
+        --muted: #8a97a6;
+        --accent: #5eead4;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(1200px 600px at 50% -10%, #16202a, var(--bg));
+        color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 20px;
+      }
+      .wrap { width: 100%; max-width: 720px; }
+      .kicker {
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        font-size: 0.72rem;
+        color: var(--accent);
+        margin: 0 0 10px;
+      }
+      h1 { margin: 0 0 8px; font-size: 1.9rem; letter-spacing: -0.01em; }
+      p.lede { margin: 0 0 28px; color: var(--muted); line-height: 1.6; }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px 22px;
+        margin-bottom: 16px;
+      }
+      .card h2 {
+        margin: 0 0 4px;
+        font-size: 1.05rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .tag {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+      .tag.after { color: var(--accent); border-color: rgba(94, 234, 212, 0.4); }
+      .card p { margin: 0 0 14px; color: var(--muted); font-size: 0.9rem; }
+      audio { width: 100%; }
+      .foot { margin-top: 24px; color: var(--muted); font-size: 0.85rem; }
+      .foot a { color: var(--accent); text-decoration: none; }
+      .foot a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <p class="kicker">Noise Reduction</p>
+      <h1>Hear the difference 🎧</h1>
+      <p class="lede">
+        A real before/after example produced by the app — the same clip, with
+        background noise removed locally by the LavaSR speech-enhancement model.
+        Press play on each to compare.
+      </p>
+
+      <section class="card">
+        <h2>Before <span class="tag">Noisy original</span></h2>
+        <p>The raw recording, with background noise present.</p>
+        <audio controls preload="none" src="8-speaker-before.wav" type="audio/wav"></audio>
+      </section>
+
+      <section class="card">
+        <h2>After <span class="tag after">Cleaned</span></h2>
+        <p>The same clip after on-device cleanup.</p>
+        <audio controls preload="none" src="8-speaker-after-cleaned.wav" type="audio/wav"></audio>
+      </section>
+
+      <p class="foot">
+        ← Back to the
+        <a href="https://github.com/devv-shayan/Noise-reduction">project repository</a>.
+        Everything runs offline on your own machine — nothing is uploaded.
+      </p>
+    </main>
+  </body>
+</html>
