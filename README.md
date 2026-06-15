@@ -2,6 +2,8 @@
 
 A local, privacy‑first desktop app for AI‑powered audio cleanup. Drop in a noisy recording — audio or video — and Noise Reduction runs a neural speech‑enhancement model entirely on your machine to produce a clean, denoised track. Nothing is uploaded; every step happens offline on your own CPU or GPU.  
 
+![Noise Reduction app](docs/app-screenshot.png)
+
 ---  
 
 ## 🎧 Hear the Difference  
@@ -11,13 +13,6 @@ A real before/after example produced by the app — same clip, background noise 
 ### ▶️ [**Play the live before/after demo →**](https://devv-shayan.github.io/Noise-reduction/)
 
 Press play on each track right in your browser (hosted from this repo via GitHub Pages — nothing downloads).
-
-Prefer the raw files? Download them directly:
-
-| | Sample |
-|--------|--------|
-| 🔊 **Before** (noisy) | [`8-speaker-before.wav`](docs/8-speaker-before.wav) |
-| ✨ **After** (cleaned) | [`8-speaker-after-cleaned.wav`](docs/8-speaker-after-cleaned.wav) |
 
 ---  
 
