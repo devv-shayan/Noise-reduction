@@ -14,6 +14,7 @@
     "engine:install": "uv sync --project engine",
     "engine:run": "uv run --project engine engine/run.py --port 8000",
     "engine:build": "uv run --project engine engine/build_sidecar.py",
+    "tauri": "tauri",
     "tauri:dev": "npm run engine:build && tauri dev",
     "tauri:build": "npm run engine:build && tauri build"
   },

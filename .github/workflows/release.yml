@@ -24,9 +24,6 @@ jobs:
           - os: macos-latest
             label: macOS (Apple Silicon)
             args: "--target aarch64-apple-darwin"
-          - os: macos-13
-            label: macOS (Intel)
-            args: "--target x86_64-apple-darwin"
           - os: ubuntu-22.04
             label: Linux
             args: ""
@@ -60,7 +57,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin' || matrix.os == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
